@@ -632,6 +632,130 @@ width: 92% !important;
             display: none !important;
         }
 }
+
+/* Click highlight animation */
+.click-highlight {
+    animation: highlightPulse 1.5s ease-out;
+}
+
+@keyframes highlightPulse {
+    0% {
+        transform: scale(0.5);
+        opacity: 0.8;
+    }
+    50% {
+        transform: scale(1.2);
+        opacity: 0.4;
+    }
+    100% {
+        transform: scale(1.5);
+        opacity: 0;
+    }
+}
+
+/* Map click mode */
+.map-click-mode-active {
+    cursor: crosshair !important;
+}
+
+.map-click-mode-active .leaflet-interactive {
+    cursor: crosshair !important;
+}
+
+/* Navigation arrows */
+.nav-arrow {
+    opacity: 0.7;
+    transition: opacity 0.3s;
+}
+
+.nav-arrow:hover {
+    opacity: 1;
+}
+
+/* Navigation markers */
+.nav-start-marker {
+    animation: pulseStart 2s infinite;
+}
+
+.nav-end-marker {
+    animation: pulseEnd 2s infinite;
+}
+
+@keyframes pulseStart {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+    100% { transform: scale(1); }
+}
+
+@keyframes pulseEnd {
+    0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+    70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+}
+
+/* Navigation camera smoothing */
+.leaflet-fade-anim .leaflet-tile,
+.leaflet-zoom-anim .leaflet-zoom-animated {
+    will-change: transform, opacity;
+}
+
+/* Better route line */
+.leaflet-interactive {
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+/* Map mode button states */
+.start-mode-btn.map-active {
+    background: rgba(59, 130, 246, 0.3) !important;
+    border-color: #3b82f6 !important;
+    color: #93c5fd !important;
+    animation: pulseMapMode 2s infinite;
+}
+
+@keyframes pulseMapMode {
+    0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4); }
+    70% { box-shadow: 0 0 0 6px rgba(59, 130, 246, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+}
+
+/* Map in click mode */
+.map-click-mode-active {
+    cursor: crosshair !important;
+}
+
+.map-click-mode-active .leaflet-interactive {
+    cursor: crosshair !important;
+}
+
+/* Click highlight */
+.click-highlight {
+    pointer-events: none;
+    z-index: 1000;
+}
+
+/* Navigation user marker */
+.nav-user-marker {
+    animation: navUserPulse 2s infinite;
+}
+
+@keyframes navUserPulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+}
+
+/* Navigation arrows */
+.nav-arrow-icon {
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4));
+    opacity: 0.9;
+    transition: opacity 0.3s;
+}
+
+.nav-arrow-icon:hover {
+    opacity: 1;
+    transform: scale(1.1);
+}
 </style>
 </head>
 <body class="bg-black">
@@ -791,6 +915,7 @@ width: 92% !important;
         </div>
     </div>
 
+
     <script>
         // Initialize variables
         let map = null;
@@ -812,22 +937,23 @@ width: 92% !important;
         let searchResults = [];
         let activeFilter = 'all';
         let isNavigating = false;
-let recentSearches = [];
+        let recentSearches = [];
 
-try {
-    const storedSearches = localStorage.getItem('strikeRecentSearches');
-    if (storedSearches) {
-        recentSearches = JSON.parse(storedSearches);
-        if (!Array.isArray(recentSearches)) {
+        try {
+            const storedSearches = localStorage.getItem('strikeRecentSearches');
+            if (storedSearches) {
+                recentSearches = JSON.parse(storedSearches);
+                if (!Array.isArray(recentSearches)) {
+                    recentSearches = [];
+                    localStorage.removeItem('strikeRecentSearches');
+                }
+            }
+        } catch (error) {
+            console.error("Error loading recent searches:", error);
             recentSearches = [];
             localStorage.removeItem('strikeRecentSearches');
         }
-    }
-} catch (error) {
-    console.error("Error loading recent searches:", error);
-    recentSearches = [];
-    localStorage.removeItem('strikeRecentSearches');
-}
+        
         let watchId = null;
         let totalRouteDistance = 0;
         let remainingDistance = 0;
@@ -840,7 +966,566 @@ try {
         let customStartPos = null;
         let customStartMarker = null;
         let destinationMarker = null;
-         
+        
+        // ============== MISSING FUNCTION DEFINITIONS ==============
+
+        // 1. Create straight path (for ferry/fallback routes)
+        function createStraightPath(start, end) {
+            return {
+                type: "LineString",
+                coordinates: [
+                    [start[1], start[0]],
+                    [end[1], end[0]]
+                ]
+            };
+        }
+
+        // 2. Real weather data using Open-Meteo (FREE, no API key)
+        async function getRealWeatherAtLocation(lat, lng) {
+            try {
+                const response = await fetch(
+                    `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m,wind_speed_10m,precipitation,weather_code&timezone=auto`
+                );
+                const data = await response.json();
+                
+                if (data.current) {
+                    const weatherCode = data.current.weather_code;
+                    let conditions = "Clear";
+                    if (weatherCode > 0 && weatherCode < 50) conditions = "Cloudy";
+                    if (weatherCode >= 50 && weatherCode < 70) conditions = "Rainy";
+                    if (weatherCode >= 70) conditions = "Snowy";
+                    
+                    return {
+                        temperature: data.current.temperature_2m,
+                        windSpeed: data.current.wind_speed_10m,
+                        precipitation: data.current.precipitation,
+                        conditions: conditions,
+                        weatherCode: weatherCode
+                    };
+                }
+            } catch (error) {
+                console.error("Weather API failed:", error);
+            }
+            return null;
+        }
+
+        // 3. Real traffic estimation using OpenStreetMap data (FREE)
+        async function getRealTrafficEstimate(start, end) {
+            try {
+                // Get route from OSRM with traffic consideration
+                const response = await fetch(
+                    `https://router.project-osrm.org/route/v1/driving/${start[1]},${start[0]};${end[1]},${end[0]}?overview=false&alternatives=false&steps=true`
+                );
+                const data = await response.json();
+                
+                if (data.routes && data.routes.length > 0) {
+                    const route = data.routes[0];
+                    const now = new Date();
+                    const hour = now.getHours();
+                    const isRushHour = (hour >= 7 && hour <= 9) || (hour >= 16 && hour <= 18);
+                    const isWeekend = now.getDay() === 0 || now.getDay() === 6;
+                    
+                    // Analyze route complexity
+                    const steps = route.legs?.[0]?.steps || [];
+                    const intersections = steps.filter(step => 
+                        step.maneuver?.type.includes('turn') || 
+                        step.maneuver?.type.includes('roundabout')
+                    ).length;
+                    
+                    // Realistic traffic estimation
+                    let trafficFactor = 1.0;
+                    if (isRushHour && !isWeekend) trafficFactor *= 1.4;
+                    if (intersections > 10) trafficFactor *= 1.2;
+                    
+                    // Weather impact
+                    const weather = await getRealWeatherAtLocation(start[0], start[1]);
+                    if (weather?.conditions === "Rainy") trafficFactor *= 1.3;
+                    if (weather?.conditions === "Snowy") trafficFactor *= 1.6;
+                    
+                    return {
+                        duration: route.duration * trafficFactor,
+                        trafficLevel: trafficFactor > 1.4 ? 'high' : trafficFactor > 1.2 ? 'medium' : 'low',
+                        intersections: intersections,
+                        weatherImpact: weather?.conditions || "Clear"
+                    };
+                }
+            } catch (error) {
+                console.error("Traffic estimation failed:", error);
+            }
+            
+            // Fallback
+            return {
+                duration: null,
+                trafficLevel: 'medium',
+                intersections: 0,
+                weatherImpact: "Unknown"
+            };
+        }
+
+        // 4. Real airport data from OurAirports (FREE database)
+async function getAllAirports() {
+    try {
+        // Use a better data source with proper airport types
+        const response = await fetch('https://raw.githubusercontent.com/jpatokal/openflights/master/data/airports.dat');
+        const data = await response.text();
+        
+        const airports = [];
+        const lines = data.split('\n');
+        
+        for (const line of lines) {
+            if (!line.trim()) continue;
+            
+            const fields = line.split(',');
+            if (fields.length >= 14) {
+                const name = fields[1].replace(/"/g, '');
+                const city = fields[2].replace(/"/g, '');
+                const country = fields[3].replace(/"/g, '');
+                const iata = fields[4].replace(/"/g, '');
+                const icao = fields[5].replace(/"/g, '');
+                const lat = parseFloat(fields[6]);
+                const lng = parseFloat(fields[7]);
+                
+                // CRITICAL: Only include airports with IATA codes AND are major
+                if (iata && iata.length === 3 && 
+                    !isNaN(lat) && !isNaN(lng) &&
+                    // EXCLUDE small/specialized airports
+                    !name.toLowerCase().includes('seaplane') &&
+                    !name.toLowerCase().includes('heliport') &&
+                    !name.toLowerCase().includes('airfield') &&
+                    !name.toLowerCase().includes('municipal') &&
+                    !name.toLowerCase().includes('regional') &&
+                    !name.toLowerCase().includes('executive') &&
+
+                    // INCLUDE only commercial airports
+                    (name.toLowerCase().includes('international') || 
+                     icao.length === 4)) { // ICAO codes indicate real airports
+                    
+                    airports.push({
+                        code: iata,
+                        name: name,
+                        city: city,
+                        country: country,
+                        coordinates: [lat, lng],
+                        type: name.includes('International') ? 'large' : 'medium'
+                    });
+                }
+            }
+        }
+        
+        return airports;
+        
+    } catch (error) {
+        console.error("Airport data failed:", error);
+        return getCommercialAirports(); // Fallback
+    }
+}
+
+        // 5. Real ferry data from OpenStreetMap (FREE)
+        async function getFerryRoutes(start, end) {
+            try {
+                const [startLng, startLat] = [start[1], start[0]];
+                const [endLng, endLat] = [end[1], end[0]];
+                
+                // Query OpenStreetMap for ferry routes (Overpass API - FREE)
+                const bbox = [
+                    Math.min(startLat, endLat) - 0.5,
+                    Math.min(startLng, endLng) - 0.5,
+                    Math.max(startLat, endLat) + 0.5,
+                    Math.max(startLng, endLng) + 0.5
+                ].join(',');
+                
+                const query = `
+                    [out:json][timeout:10];
+                    (
+                        way["route"="ferry"](${bbox});
+                        relation["route"="ferry"](${bbox});
+                        node["amenity"="ferry_terminal"](${bbox});
+                    );
+                    out body;
+                `;
+                
+                const response = await fetch(
+                    `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`
+                );
+                const data = await response.json();
+                
+                if (data.elements && data.elements.length > 0) {
+                    const ferryTerminals = data.elements.filter(el => 
+                        el.type === 'node' && el.tags?.amenity === 'ferry_terminal'
+                    );
+                    
+                    // Check if start/end are near ferry terminals
+                    const startTerminal = findNearestTerminal(start, ferryTerminals);
+                    const endTerminal = findNearestTerminal(end, ferryTerminals);
+                    
+                    if (startTerminal && endTerminal) {
+                        const distance = map.distance(start, end);
+                        // Average ferry speed: 40 km/h (11.1 m/s)
+                        const ferryTime = (distance / 11100) * 3600; // Convert to hours
+                        
+                        return {
+                            hasFerry: true,
+                            duration: ferryTime + 1800, // +30 min for boarding
+                            distance: distance,
+                            terminals: {
+                                start: startTerminal.name,
+                                end: endTerminal.name
+                            },
+                            details: `Ferry from ${startTerminal.name} to ${endTerminal.name}`
+                        };
+                    }
+                }
+            } catch (error) {
+                console.error("Ferry route check failed:", error);
+            }
+            
+            return { hasFerry: false };
+        }
+
+        function findNearestTerminal(point, terminals) {
+            const [lat, lng] = point;
+            let nearest = null;
+            let minDistance = Infinity;
+            
+            for (const terminal of terminals) {
+                if (terminal.lat && terminal.lon) {
+                    const distance = map.distance([lat, lng], [terminal.lat, terminal.lon]);
+                    if (distance < 50000 && distance < minDistance) { // Within 50km
+                        minDistance = distance;
+                        nearest = {
+                            name: terminal.tags?.name || "Ferry Terminal",
+                            lat: terminal.lat,
+                            lng: terminal.lon,
+                            distance: distance
+                        };
+                    }
+                }
+            }
+            
+            return nearest;
+        }
+
+        // 6. Real cycling/walking times with elevation consideration
+        async function getElevationAdjustedTime(start, end, mode) {
+            try {
+                // Get elevation data from Open-Elevation (FREE)
+                const response = await fetch(
+                    `https://api.open-elevation.com/api/v1/lookup?locations=${start[0]},${start[1]}|${end[0]},${end[1]}`
+                );
+                const data = await response.json();
+                
+                if (data.results && data.results.length === 2) {
+                    const startElev = data.results[0].elevation;
+                    const endElev = data.results[1].elevation;
+                    const elevationGain = Math.max(0, endElev - startElev);
+                    
+                    // Base speeds
+                    let baseSpeed = mode === 'cycling' ? 15000 : 5000; // m/h
+                    
+                    // Adjust for elevation
+                    if (elevationGain > 100) {
+                        baseSpeed *= 0.7; // 30% slower for significant climbs
+                    } else if (elevationGain < -100) {
+                        baseSpeed *= 1.3; // 30% faster for descents
+                    }
+                    
+                    const distance = map.distance(start, end);
+                    return (distance / baseSpeed) * 3600; // Convert to seconds
+                }
+            } catch (error) {
+                console.error("Elevation API failed:", error);
+            }
+            
+            // Fallback: straight distance calculation
+            const distance = map.distance(start, end);
+            const baseSpeed = mode === 'cycling' ? 15000 : 5000;
+            return (distance / baseSpeed) * 3600;
+        }
+
+        // 7. Missing helper functions
+        function getFallbackAirports() {
+            return getCommercialAirports();
+        }
+
+        function cityPopulationLookup(city, country) {
+            // Simplified population estimation
+            const majorCities = {
+                "New York": 8419000,
+                "Los Angeles": 3980000,
+                "Chicago": 2716000,
+                "Houston": 2328000,
+                "Phoenix": 1689000,
+                "Philadelphia": 1584000,
+                "San Antonio": 1547000,
+                "San Diego": 1426000,
+                "Dallas": 1344000,
+                "San Jose": 1035000,
+                "London": 8900000,
+                "Paris": 2148000,
+                "Berlin": 3769000,
+                "Madrid": 3223000,
+                "Rome": 2873000,
+                "Tokyo": 13960000,
+                "Beijing": 21540000,
+                "Shanghai": 26320000,
+                "Delhi": 32941000,
+                "Mumbai": 21357000
+            };
+            
+            return majorCities[city] || 100000; // Default to 100k if unknown
+        }
+
+        function isMajorCity(city, country) {
+            const majorCities = [
+                "New York", "Los Angeles", "Chicago", "Houston", "Phoenix",
+                "Philadelphia", "San Antonio", "San Diego", "Dallas", "San Jose",
+                "London", "Paris", "Berlin", "Madrid", "Rome", "Barcelona",
+                "Tokyo", "Beijing", "Shanghai", "Delhi", "Mumbai", "Sydney",
+                "Melbourne", "Toronto", "Vancouver", "Montreal", "Mexico City",
+                "São Paulo", "Rio de Janeiro", "Buenos Aires", "Cairo", "Johannesburg"
+            ];
+            
+            return majorCities.includes(city);
+        }
+
+        async function getFlightStatus(departureAirport, arrivalAirport) {
+    // OpenSky API doesn't allow future/historical without auth
+    // Return estimated flight time instead
+    const flightDistance = map.distance(departureAirport.coordinates, arrivalAirport.coordinates);
+    const flightTime = (flightDistance / 750000) * 3600; // 750 km/h average
+    
+    return {
+        available: true,
+        duration: flightTime,
+        airline: "Estimated",
+        status: "Estimated"
+    };
+}
+
+        // 9. Enhanced calculateRoutes with real data
+        async function calculateRealRoutes(start, end) {
+            const routes = [];
+            const directDistance = map.distance(start, end);
+            
+            // Get real-time data in parallel
+            const [trafficData, weatherData, ferryData] = await Promise.all([
+                getRealTrafficEstimate(start, end),
+                getRealWeatherAtLocation(start[0], start[1]),
+                getFerryRoutes(start, end)
+            ]);
+            
+            // DRIVING - with real traffic
+            try {
+                const drivingResponse = await fetch(
+                    `https://router.project-osrm.org/route/v1/driving/${start[1]},${start[0]};${end[1]},${end[0]}?overview=full&geometries=geojson&steps=true`
+                );
+                const drivingData = await drivingResponse.json();
+                
+                if (drivingData.routes?.[0]) {
+                    const baseDuration = drivingData.routes[0].duration;
+                    const adjustedDuration = trafficData.duration || baseDuration * 1.2;
+                    
+                    routes.push({
+                        id: 'driving',
+                        icon: 'lucide:car',
+                        label: 'Driving',
+                        duration: adjustedDuration,
+                        distance: drivingData.routes[0].distance,
+                        geometry: drivingData.routes[0].geometry,
+                        steps: processOSRMSteps(drivingData.routes[0].legs?.[0]?.steps || []),
+                        traffic: trafficData.trafficLevel,
+                        weather: weatherData?.conditions,
+                        realData: true
+                    });
+                }
+            } catch (error) {
+                console.error("Driving route failed:", error);
+            }
+            
+            // CYCLING - with elevation adjustment
+            try {
+                const cyclingTime = await getElevationAdjustedTime(start, end, 'cycling');
+                
+                routes.push({
+                    id: 'cycling',
+                    icon: 'lucide:bike',
+                    label: 'Cycling',
+                    duration: cyclingTime,
+                    distance: directDistance,
+                    geometry: createStraightPath(start, end),
+                    steps: [],
+                    elevationAdjusted: true,
+                    realData: true
+                });
+            } catch (error) {
+                console.error("Cycling route failed:", error);
+            }
+            
+            // WALKING - with elevation adjustment
+            try {
+                const walkingTime = await getElevationAdjustedTime(start, end, 'walking');
+                
+                routes.push({
+                    id: 'walking',
+                    icon: 'lucide:footprints',
+                    label: 'Walking',
+                    duration: walkingTime,
+                    distance: directDistance,
+                    geometry: createStraightPath(start, end),
+                    steps: [],
+                    elevationAdjusted: true,
+                    realData: true
+                });
+            } catch (error) {
+                console.error("Walking route failed:", error);
+            }
+            
+            // FERRY - if available
+            if (ferryData.hasFerry && directDistance > 10000 && directDistance < 500000) {
+                routes.push({
+                    id: 'ferry',
+                    icon: 'lucide:ship',
+                    label: 'Ferry',
+                    duration: ferryData.duration,
+                    distance: ferryData.distance,
+                    geometry: createStraightPath(start, end),
+                    steps: [{
+                        distance: ferryData.distance,
+                        duration: ferryData.duration,
+                        maneuver: {
+                            instruction: `Take ferry from ${ferryData.terminals.start} to ${ferryData.terminals.end}`,
+                            type: 'ferry'
+                        }
+                    }],
+                    realData: true
+                });
+            }
+            
+            // FLIGHT - only for long distances
+            if (directDistance > 300000) {
+                const flightRoute = await calculateSmartFlightRoute(start, end, directDistance);
+                if (flightRoute) {
+                    routes.push(flightRoute);
+                }
+            }
+            
+            return routes;
+        }
+
+        // 10. Smart flight route with real data
+        async function calculateSmartFlightRoute(start, end, distance) {
+            try {
+                // Load airports
+                const airports = await getAllAirports();
+                
+                // Sort by airport size AND distance
+       const startAirports = airports
+            .map(airport => ({
+                ...airport,
+                distance: map.distance(start, airport.coordinates),
+                score: calculateAirportScore(airport, start) // USE SCORING FUNCTION
+            }))
+            .filter(a => a.distance < 150000) // Within 150km
+            .sort((a, b) => b.score - a.score); // Higher score first
+                
+                const endAirports = airports
+                    .map(a => ({
+                        ...a,
+                        distance: map.distance(end, a.coordinates)
+                    }))
+                    .filter(a => a.distance < 150000)
+                    .sort((a, b) => a.distance - b.distance);
+                
+                if (startAirports.length === 0 || endAirports.length === 0) return null;
+                
+                const startAirport = startAirports[0];
+                const endAirport = endAirports[0];
+                
+                if (startAirport.code === endAirport.code) return null;
+                
+                const airportDistance = map.distance(startAirport.coordinates, endAirport.coordinates);
+                if (airportDistance < 500000) return null;
+                
+                const flightData = await getFlightStatus(startAirport, endAirport);
+                
+                // Calculate times
+                const groundSpeed = 50000; // 50 km/h for ground transport
+                const toAirportTime = (startAirport.distance / groundSpeed) * 3600;
+                const fromAirportTime = (endAirport.distance / groundSpeed) * 3600;
+                
+                // Use real flight duration if available, otherwise estimate
+                const flightTime = flightData.duration || (airportDistance / 750000) * 3600;
+                const airportTime = 7200; // 2 hours for airport processes
+                
+                const totalTime = toAirportTime + flightTime + fromAirportTime + airportTime;
+                
+                // Only suggest if it makes sense
+                const drivingEstimate = (distance / 80000) * 3600;
+                if (totalTime > drivingEstimate * 0.8) return null;
+                
+                return {
+                    id: 'flight',
+                    icon: 'lucide:plane',
+                    label: 'Flight',
+                    duration: totalTime,
+                    distance: airportDistance,
+                    geometry: createFlightPath(startAirport.coordinates, endAirport.coordinates),
+                    steps: [
+                        {
+                            distance: startAirport.distance,
+                            duration: toAirportTime,
+                            maneuver: { instruction: `Travel to ${startAirport.name}`, type: 'ground' }
+                        },
+                        {
+                            distance: airportDistance,
+                            duration: flightTime,
+                            maneuver: { instruction: `Fly to ${endAirport.name}`, type: 'flight' }
+                        },
+                        {
+                            distance: endAirport.distance,
+                            duration: fromAirportTime,
+                            maneuver: { instruction: `Travel to destination`, type: 'ground' }
+                        }
+                    ],
+                    airports: { departure: startAirport, arrival: endAirport },
+                    flightData: flightData,
+                    realData: true,
+                    details: `${startAirport.code} → ${endAirport.code}`
+                };
+                
+            } catch (error) {
+                console.error("Smart flight route failed:", error);
+                return null;
+            }
+        }
+
+        // 11. Update the main calculateRoutes function to use real data
+        async function calculateRoutes(start, end) {
+            const container = document.getElementById('route-options');
+            container.innerHTML = '<div class="text-xs text-neutral-500 p-4 text-center">Calculating real-time routes...</div>';
+            
+            try {
+                // Use the new real data function
+                const routes = await calculateRealRoutes(start, end);
+                
+                container.innerHTML = '';
+                if (routes.length === 0) {
+                    container.innerHTML = '<div class="text-xs text-neutral-500 p-4 text-center">No routes available</div>';
+                    return;
+                }
+                
+                routes.forEach(route => {
+                    addRouteCard(route);
+                });
+                
+            } catch (error) {
+                console.error("Route calculation failed:", error);
+                container.innerHTML = '<div class="text-xs text-neutral-500 p-4 text-center">Failed to calculate routes</div>';
+            }
+        }
+
+        // ============== END OF MISSING FUNCTION DEFINITIONS ==============
+        
         // Map initialization function
         function initMap() {
             map = L.map('map', { 
@@ -876,27 +1561,28 @@ try {
                 })
             });
 
-    destinationMarker = L.marker([0,0], {
-        icon: L.divIcon({
-            className: 'destination-marker',
-            html: '<div style="background: #ef4444; width: 16px; height: 16px; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 10px rgba(239,68,68,0.5); position: relative;"><div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 6px; height: 6px; background: white; border-radius: 50%;"></div></div>',
-            iconSize: [22, 22],
-            iconAnchor: [11, 11]
-        }),
-        zIndexOffset: 1000
-    });
+            destinationMarker = L.marker([0,0], {
+                icon: L.divIcon({
+                    className: 'destination-marker',
+                    html: '<div style="background: #ef4444; width: 16px; height: 16px; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 10px rgba(239,68,68,0.5); position: relative;"><div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 6px; height: 6px; background: white; border-radius: 50%;"></div></div>',
+                    iconSize: [22, 22],
+                    iconAnchor: [11, 11]
+                }),
+                zIndexOffset: 1000
+            });
         }
         
         // Setup map event listeners
         function setupMapEvents() {
             if (!map) return;
+
+            map.off('click');
             
             map.on('click', (e) => {
                 if (isNavigating) return;
                 
-                if (customStartMode === 'map') {
-                    // Set custom start point from map click
-                    setCustomStartFromMap(e.latlng);
+                if (isMapClickModeActive) {
+                    return;
                 } else {
                     // Normal behavior - trigger analysis on clicked point
                     triggerAnalysis(e.latlng.lat, e.latlng.lng);
@@ -915,132 +1601,136 @@ try {
         }
         
         // --- CUSTOM START POINT FUNCTIONS ---
-        function toggleStartPanel() {
+        function toggleStartPanel(e) {
+            e.stopPropagation();
             const expanded = document.getElementById('custom-start-expanded');
+            const searchResults = document.getElementById('results');
+            const customSearchResults = document.getElementById('custom-start-search-results');
+            
+            // Close search results if open
+            if (searchResults && !searchResults.classList.contains('hidden')) {
+                hideSearchResults();
+            }
+            
+            // Close custom search results
+            if (customSearchResults && customSearchResults.style.display === 'block') {
+                customSearchResults.style.display = 'none';
+            }
+            
+            // Toggle starting panel
             if (expanded.style.display === 'block') {
                 expanded.style.display = 'none';
             } else {
                 expanded.style.display = 'block';
+                
+                // Reset to default height (show full content)
+                expanded.style.maxHeight = '400px';
+                
+                // Ensure the panel is visible in viewport
+                const panelRect = expanded.getBoundingClientRect();
+                const viewportHeight = window.innerHeight;
+                
+                // If panel would go below viewport, adjust max-height
+                if (panelRect.bottom > viewportHeight - 10) {
+                    const availableHeight = viewportHeight - panelRect.top - 20;
+                    expanded.style.maxHeight = Math.max(150, availableHeight) + 'px';
+                }
             }
         }
 
-function toggleStartPanel(e) {
-    e.stopPropagation();
-    const expanded = document.getElementById('custom-start-expanded');
-    const searchResults = document.getElementById('results');
-    const customSearchResults = document.getElementById('custom-start-search-results');
-    
-    // Close search results if open
-    if (searchResults && !searchResults.classList.contains('hidden')) {
-        hideSearchResults();
-    }
-    
-    // Close custom search results
-    if (customSearchResults && customSearchResults.style.display === 'block') {
-        customSearchResults.style.display = 'none';
-    }
-    
-    // Toggle starting panel
-    if (expanded.style.display === 'block') {
-        expanded.style.display = 'none';
-    } else {
-        expanded.style.display = 'block';
-        
-        // Reset to default height (show full content)
-        expanded.style.maxHeight = '400px';
-        
-        // Ensure the panel is visible in viewport
-        const panelRect = expanded.getBoundingClientRect();
-        const viewportHeight = window.innerHeight;
-        
-        // If panel would go below viewport, adjust max-height
-        if (panelRect.bottom > viewportHeight - 10) {
-            const availableHeight = viewportHeight - panelRect.top - 20;
-            expanded.style.maxHeight = Math.max(150, availableHeight) + 'px';
+        window.addEventListener('resize', () => {
+            const expanded = document.getElementById('custom-start-expanded');
+            if (expanded.style.display === 'block') {
+                const panelRect = expanded.getBoundingClientRect();
+                const viewportHeight = window.innerHeight;
+                
+                // If panel goes below viewport, adjust max-height
+                if (panelRect.bottom > viewportHeight - 10) {
+                    const availableHeight = viewportHeight - panelRect.top - 20;
+                    expanded.style.maxHeight = Math.max(150, availableHeight) + 'px';
+                } else {
+                    expanded.style.maxHeight = '400px';
+                }
+            }
+        });
+
+        // Update click outside detection
+        document.addEventListener('click', (e) => {
+            const startPanel = document.getElementById('custom-start-panel');
+            const startToggle = document.getElementById('custom-start-toggle');
+            const startExpanded = document.getElementById('custom-start-expanded');
+            const customStartInput = document.getElementById('custom-start-input');
+            const customSearchResults = document.getElementById('custom-start-search-results');
+            
+            // Check if click is inside search results
+            const isInSearchResults = customSearchResults && customSearchResults.contains(e.target);
+            
+            // Close starting point panel if clicking outside
+            if (startExpanded.style.display === 'block' && 
+                !startPanel.contains(e.target) && 
+                e.target !== startToggle &&
+                e.target !== customStartInput &&
+                !isInSearchResults) {
+                startExpanded.style.display = 'none';
+            }
+        });
+
+        function calculateDynamicHeight() {
+            const expanded = document.getElementById('custom-start-expanded');
+            if (!expanded || expanded.style.display !== 'block') return;
+            
+            // Get viewport height
+            const viewportHeight = window.innerHeight;
+            
+            // Get panel position and dimensions
+            const panelRect = expanded.getBoundingClientRect();
+            const toggleRect = document.getElementById('custom-start-toggle').getBoundingClientRect();
+            
+            // Calculate available space from panel top to 10px above bottom
+            const spaceFromTop = toggleRect.top + toggleRect.height + 8; // Panel top position
+            const spaceToBottom = viewportHeight - spaceFromTop - 10; // 10px margin from bottom
+            
+            // Set max height (but not less than 150px)
+            const maxHeight = Math.max(150, Math.min(400, spaceToBottom));
+            
+            expanded.style.maxHeight = `${maxHeight}px`;
+            expanded.style.position = 'absolute';
+            expanded.style.top = 'calc(100% + 8px)';
+            expanded.style.left = '0';
+            expanded.style.right = '0';
         }
-    }
-}
 
-window.addEventListener('resize', () => {
-    const expanded = document.getElementById('custom-start-expanded');
-    if (expanded.style.display === 'block') {
-        const panelRect = expanded.getBoundingClientRect();
-        const viewportHeight = window.innerHeight;
+        // Recalculate height on window resize
+        window.addEventListener('resize', calculateDynamicHeight);
+
+        // Also recalculate when switching modes
+        document.querySelectorAll('.start-mode-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                setTimeout(() => calculateDynamicHeight(), 100);
+            });
+        });
+
+        // Recalculate when search results appear
+        const customStartInput = document.getElementById('custom-start-input');
+        customStartInput.addEventListener('input', () => {
+            setTimeout(() => calculateDynamicHeight(), 200);
+        });
         
-        // If panel goes below viewport, adjust max-height
-        if (panelRect.bottom > viewportHeight - 10) {
-            const availableHeight = viewportHeight - panelRect.top - 20;
-            expanded.style.maxHeight = Math.max(150, availableHeight) + 'px';
-        } else {
-            expanded.style.maxHeight = '400px';
-        }
-    }
-});
+        let isMapClickModeActive = false;
+        let mapClickListener = null;
 
-// Update click outside detection
-document.addEventListener('click', (e) => {
-    const startPanel = document.getElementById('custom-start-panel');
-    const startToggle = document.getElementById('custom-start-toggle');
-    const startExpanded = document.getElementById('custom-start-expanded');
-    const customStartInput = document.getElementById('custom-start-input');
-    const customSearchResults = document.getElementById('custom-start-search-results');
-    
-    // Check if click is inside search results
-    const isInSearchResults = customSearchResults && customSearchResults.contains(e.target);
-    
-    // Close starting point panel if clicking outside
-    if (startExpanded.style.display === 'block' && 
-        !startPanel.contains(e.target) && 
-        e.target !== startToggle &&
-        e.target !== customStartInput &&
-        !isInSearchResults) {
-        startExpanded.style.display = 'none';
-    }
-});
-
-function calculateDynamicHeight() {
-    const expanded = document.getElementById('custom-start-expanded');
-    if (!expanded || expanded.style.display !== 'block') return;
-    
-    // Get viewport height
-    const viewportHeight = window.innerHeight;
-    
-    // Get panel position and dimensions
-    const panelRect = expanded.getBoundingClientRect();
-    const toggleRect = document.getElementById('custom-start-toggle').getBoundingClientRect();
-    
-    // Calculate available space from panel top to 10px above bottom
-    const spaceFromTop = toggleRect.top + toggleRect.height + 8; // Panel top position
-    const spaceToBottom = viewportHeight - spaceFromTop - 10; // 10px margin from bottom
-    
-    // Set max height (but not less than 150px)
-    const maxHeight = Math.max(150, Math.min(400, spaceToBottom));
-    
-    expanded.style.maxHeight = `${maxHeight}px`;
-    expanded.style.position = 'absolute';
-    expanded.style.top = 'calc(100% + 8px)';
-    expanded.style.left = '0';
-    expanded.style.right = '0';
-}
-
-// Recalculate height on window resize
-window.addEventListener('resize', calculateDynamicHeight);
-
-// Also recalculate when switching modes
-document.querySelectorAll('.start-mode-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-        setTimeout(() => calculateDynamicHeight(), 100);
-    });
-});
-
-// Recalculate when search results appear
-const customStartInput = document.getElementById('custom-start-input');
-customStartInput.addEventListener('input', () => {
-    setTimeout(() => calculateDynamicHeight(), 200);
-});
-        
         function setStartMode(mode) {
+            const previousMode = customStartMode;
             customStartMode = mode;
+            
+            // Remove any existing map click listener
+            if (mapClickListener) {
+                map.off('click', mapClickListener);
+                mapClickListener = null;
+            }
+            
+            // Reset map click mode flag based on mode
+            isMapClickModeActive = (mode === 'map');
             
             // Update UI
             document.querySelectorAll('.start-mode-btn').forEach(btn => {
@@ -1054,6 +1744,23 @@ customStartInput.addEventListener('input', () => {
                 mode === 'current' ? 'Current Location' :
                 mode === 'map' ? 'Click on Map' :
                 'Search for Location';
+            
+            // Handle map mode
+            if (mode === 'map') {
+                // Only enable clicking if we have a marker or this is first time
+                if (!customStartPos || previousMode !== 'map') {
+                    enableMapClickMode();
+                } else {
+                    // If we already have a marker, show active state but don't enable clicking
+                    updateMapModeUI(true);
+                }
+                
+                // Ensure map cursor is correct
+                map.getContainer().style.cursor = isMapClickModeActive ? 'crosshair' : '';
+                
+            } else {
+                disableMapClickMode();
+            }
             
             // Show/hide search input
             const searchContainer = document.getElementById('custom-start-input-container');
@@ -1079,10 +1786,111 @@ customStartInput.addEventListener('input', () => {
                 calculateRoutes(getCurrentStartPoint(), selectedTarget);
             }
         }
+
+        function enableMapClickMode() {
+            isMapClickModeActive = true;
+            
+            // Change cursor
+            map.getContainer().style.cursor = 'crosshair';
+            map.getContainer().classList.add('map-click-mode-active');
+            
+            // Update UI to show active state
+            updateMapModeUI(true);
+            
+            // One-time click handler
+            mapClickListener = (e) => {
+                // Set the point
+                setCustomStartFromMap(e.latlng);
+                
+                // DISABLE further map clicks
+                disableMapClickMode();
+                
+                // But KEEP the mode as "map" in the UI
+                // Don't call setStartMode('current')
+            };
+            
+            map.on('click', mapClickListener);
+        }
+
+        function disableMapClickMode() {
+            isMapClickModeActive = false;
+            map.getContainer().style.cursor = '';
+            map.getContainer().classList.remove('map-click-mode-active');
+            
+            // Update UI to show inactive state
+            updateMapModeUI(false);
+            
+            if (mapClickListener) {
+                map.off('click', mapClickListener);
+                mapClickListener = null;
+            }
+        }
+
+        function updateMapModeUI(isActive) {
+            const mapModeBtn = document.querySelector('.start-mode-btn[data-mode="map"]');
+            if (!mapModeBtn) return;
+            
+            if (isActive) {
+                // Active state: blue background, white text
+                mapModeBtn.style.background = 'rgba(59, 130, 246, 0.3)';
+                mapModeBtn.style.borderColor = '#3b82f6';
+                mapModeBtn.style.color = '#93c5fd';
+                mapModeBtn.innerHTML = `
+                    <iconify-icon icon="lucide:map-pin"></iconify-icon>
+                    Click on Map <span style="font-size: 9px; opacity: 0.8;">(click map)</span>
+                `;
+            } else {
+                // Inactive state: normal styling
+                mapModeBtn.style.background = '';
+                mapModeBtn.style.borderColor = '';
+                mapModeBtn.style.color = '';
+                mapModeBtn.innerHTML = `
+                    <iconify-icon icon="lucide:map-pin"></iconify-icon>
+                    Click on Map
+                `;
+            }
+        }
+
+        function showClickHighlight(latlng) {
+            // Remove existing highlight
+            removeClickHighlight();
+            
+            // Create a subtle pulse effect
+            window.clickHighlight = L.circleMarker(latlng, {
+                radius: 15,
+                color: '#3b82f6',
+                weight: 3,
+                opacity: 0.8,
+                fillColor: '#3b82f6',
+                fillOpacity: 0.2,
+                className: 'click-highlight'
+            }).addTo(map);
+            
+            // Remove after 1.5 seconds
+            setTimeout(() => {
+                removeClickHighlight();
+            }, 1500);
+        }
+
+        function removeClickHighlight() {
+            if (window.clickHighlight) {
+                map.removeLayer(window.clickHighlight);
+                window.clickHighlight = null;
+            }
+        }
         
         function setCustomStartFromMap(latlng) {
             customStartPos = [latlng.lat, latlng.lng];
+            
+            // IMPORTANT: Keep mode as 'map' but disable active clicking
+            // DON'T change the mode back to 'current'
+            customStartMode = 'map';
+            
+            // Update marker
             updateCustomStartMarker();
+            
+            // Show temporary highlight
+            showClickHighlight(latlng);
             
             // Reverse geocode to get address
             fetch(`https://photon.komoot.io/reverse?lon=${latlng.lng}&lat=${latlng.lat}&limit=1`)
@@ -1107,87 +1915,96 @@ customStartInput.addEventListener('input', () => {
             if (selectedTarget) {
                 calculateRoutes(customStartPos, selectedTarget);
             }
+            
+            // Re-center map on clicked point
+            map.flyTo(latlng, 15, {
+                animate: true,
+                duration: 0.5
+            });
+            
+            // DO NOT change mode automatically
+            // User remains in "map" mode but clicking is disabled until they click button again
         }
         
-function searchCustomStartLocation(query) {
-    if (!query || query.trim().length < 2) {
-        const container = document.getElementById('custom-start-search-results');
-        container.style.display = 'none';
-        return;
-    }
-    
-    fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=10`)
-        .then(res => res.json())
-        .then(data => {
-            const results = data.features || [];
-            const container = document.getElementById('custom-start-search-results');
-            
-            if (results.length === 0) {
-                container.innerHTML = '<div class="text-xs text-neutral-500 p-2 text-center">No results found</div>';
-                container.style.display = 'block';
+        function searchCustomStartLocation(query) {
+            if (!query || query.trim().length < 2) {
+                const container = document.getElementById('custom-start-search-results');
+                container.style.display = 'none';
                 return;
             }
             
-            let html = '';
-            results.forEach(result => {
-                const props = result.properties;
-                const name = props.name || props.street || props.city || "Unnamed Location";
-                const details = [props.housenumber, props.street, props.city, props.country]
-                    .filter(Boolean)
-                    .join(', ') || 'Coordinates';
-                
-                html += `
-                    <div class="search-result" data-lat="${result.geometry.coordinates[1]}" data-lng="${result.geometry.coordinates[0]}" data-name="${name}">
-                        <div class="text-[11px] font-bold text-white mb-1">${name}</div>
-                        <div class="text-[9px] text-neutral-400">${details}</div>
-                    </div>
-                `;
-            });
-            
-            container.innerHTML = html;
-            container.style.display = 'block';
-            
-            // Ensure container doesn't exceed available space
-            const expanded = document.getElementById('custom-start-expanded');
-            const expandedRect = expanded.getBoundingClientRect();
-            const viewportHeight = window.innerHeight;
-            
-            // Calculate available space for search results
-            const resultsHeight = Math.min(150, viewportHeight - expandedRect.top - 180);
-            container.style.maxHeight = resultsHeight + 'px';
-            
-            // Add click handlers
-            document.querySelectorAll('#custom-start-search-results .search-result').forEach(item => {
-                item.addEventListener('click', () => {
-                    const lat = parseFloat(item.dataset.lat);
-                    const lng = parseFloat(item.dataset.lng);
-                    const name = item.dataset.name;
+            fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=10`)
+                .then(res => res.json())
+                .then(data => {
+                    const results = data.features || [];
+                    const container = document.getElementById('custom-start-search-results');
                     
-                    customStartPos = [lat, lng];
-                    customStartMode = 'search';
-                    updateCustomStartMarker();
-                    
-                    // Update display
-                    document.getElementById('start-point-coords').textContent = name;
-                    
-                    // Hide results and clear input
-                    container.style.display = 'none';
-                    document.getElementById('custom-start-input').value = name;
-                    
-                    // If we have a target selected, recalculate routes
-                    if (selectedTarget) {
-                        calculateRoutes(customStartPos, selectedTarget);
+                    if (results.length === 0) {
+                        container.innerHTML = '<div class="text-xs text-neutral-500 p-2 text-center">No results found</div>';
+                        container.style.display = 'block';
+                        return;
                     }
                     
-                    // Center map on selected location
-                    map.flyTo([lat, lng], 14, { animate: true, duration: 1 });
+                    let html = '';
+                    results.forEach(result => {
+                        const props = result.properties;
+                        const name = props.name || props.street || props.city || "Unnamed Location";
+                        const details = [props.housenumber, props.street, props.city, props.country]
+                            .filter(Boolean)
+                            .join(', ') || 'Coordinates';
+                        
+                        html += `
+                            <div class="search-result" data-lat="${result.geometry.coordinates[1]}" data-lng="${result.geometry.coordinates[0]}" data-name="${name}">
+                                <div class="text-[11px] font-bold text-white mb-1">${name}</div>
+                                <div class="text-[9px] text-neutral-400">${details}</div>
+                            </div>
+                        `;
+                    });
+                    
+                    container.innerHTML = html;
+                    container.style.display = 'block';
+                    
+                    // Ensure container doesn't exceed available space
+                    const expanded = document.getElementById('custom-start-expanded');
+                    const expandedRect = expanded.getBoundingClientRect();
+                    const viewportHeight = window.innerHeight;
+                    
+                    // Calculate available space for search results
+                    const resultsHeight = Math.min(150, viewportHeight - expandedRect.top - 180);
+                    container.style.maxHeight = resultsHeight + 'px';
+                    
+                    // Add click handlers
+                    document.querySelectorAll('#custom-start-search-results .search-result').forEach(item => {
+                        item.addEventListener('click', () => {
+                            const lat = parseFloat(item.dataset.lat);
+                            const lng = parseFloat(item.dataset.lng);
+                            const name = item.dataset.name;
+                            
+                            customStartPos = [lat, lng];
+                            customStartMode = 'search';
+                            updateCustomStartMarker();
+                            
+                            // Update display
+                            document.getElementById('start-point-coords').textContent = name;
+                            
+                            // Hide results and clear input
+                            container.style.display = 'none';
+                            document.getElementById('custom-start-input').value = name;
+                            
+                            // If we have a target selected, recalculate routes
+                            if (selectedTarget) {
+                                calculateRoutes(customStartPos, selectedTarget);
+                            }
+                            
+                            // Center map on selected location
+                            map.flyTo([lat, lng], 14, { animate: true, duration: 1 });
+                        });
+                    });
+                })
+                .catch(error => {
+                    console.error("Custom start search failed:", error);
                 });
-            });
-        })
-        .catch(error => {
-            console.error("Custom start search failed:", error);
-        });
-}
+        }
         
         function updateCustomStartMarker() {
             // Remove existing marker
@@ -1235,8 +2052,37 @@ function searchCustomStartLocation(query) {
             // Setup custom start point UI
             document.getElementById('custom-start-toggle').addEventListener('click', toggleStartPanel);
             
+            // Update the start mode button handler
             document.querySelectorAll('.start-mode-btn').forEach(btn => {
-                btn.addEventListener('click', () => setStartMode(btn.dataset.mode));
+                btn.addEventListener('click', () => {
+                    const mode = btn.dataset.mode;
+                    
+                    // If clicking "Click on Map" button
+                    if (mode === 'map') {
+                        // If we're already in map mode but NOT in active click state
+                        if (customStartMode === 'map' && !isMapClickModeActive) {
+                            // Re-enable map clicking
+                            enableMapClickMode();
+                            return;
+                        }
+                        
+                        // If we're already in map mode AND in active click state
+                        if (customStartMode === 'map' && isMapClickModeActive) {
+                            // Toggle off - switch to current location mode
+                            setStartMode('current');
+                            disableMapClickMode();
+                            return;
+                        }
+                        
+                        // Otherwise, switch to map mode
+                        setStartMode('map');
+                        
+                    } else {
+                        // For other modes (current, search)
+                        setStartMode(mode);
+                        disableMapClickMode();
+                    }
+                });
             });
             
             // Custom start search input
@@ -1329,48 +2175,48 @@ function searchCustomStartLocation(query) {
         };
         
         function startContinuousGPS() {
-    // Don't start if we don't have permission or if already watching
-    if (watchId) {
-        navigator.geolocation.clearWatch(watchId);
-        watchId = null;
-    }
-    
-    // Start watching position silently (no permission prompt)
-    watchId = navigator.geolocation.watchPosition(
-        (pos) => {
-            userPos = [pos.coords.latitude, pos.coords.longitude];
-            
-            // Update marker position
-            userMarker.setLatLng(userPos);
-            
-            // Update start point display if using current location
-            if (customStartMode === 'current') {
-                updateStartPointDisplay();
+            // Don't start if we don't have permission or if already watching
+            if (watchId) {
+                navigator.geolocation.clearWatch(watchId);
+                watchId = null;
             }
             
-            // Update HUD - only if not navigating
-            if (!isNavigating) {
-                document.getElementById('hud-precision').innerText = `${pos.coords.accuracy.toFixed(0)}m`;
-                document.getElementById('hud-coords').innerText = 
-                    `${userPos[0].toFixed(4)}, ${userPos[1].toFixed(4)}`;
-            }
-            
-            // Check navigation progress
-            if (isNavigating && currentNavRoute) {
-                checkNavigationProgress(pos);
-            }
-        },
-        (error) => {
-            console.log("GPS watch error:", error);
-            // Don't retry continuously if permission is denied
-        },
-        { 
-            enableHighAccuracy: true,
-            maximumAge: 5000, // 5 seconds
-            timeout: 15000 // 15 second timeout
+            // Start watching position silently (no permission prompt)
+            watchId = navigator.geolocation.watchPosition(
+                (pos) => {
+                    userPos = [pos.coords.latitude, pos.coords.longitude];
+                    
+                    // Update marker position
+                    userMarker.setLatLng(userPos);
+                    
+                    // Update start point display if using current location
+                    if (customStartMode === 'current') {
+                        updateStartPointDisplay();
+                    }
+                    
+                    // Update HUD - only if not navigating
+                    if (!isNavigating) {
+                        document.getElementById('hud-precision').innerText = `${pos.coords.accuracy.toFixed(0)}m`;
+                        document.getElementById('hud-coords').innerText = 
+                            `${userPos[0].toFixed(4)}, ${userPos[1].toFixed(4)}`;
+                    }
+                    
+                    // Check navigation progress
+                    if (isNavigating && currentNavRoute) {
+                        checkNavigationProgress(pos);
+                    }
+                },
+                (error) => {
+                    console.log("GPS watch error:", error);
+                    // Don't retry continuously if permission is denied
+                },
+                { 
+                    enableHighAccuracy: true,
+                    maximumAge: 5000, // 5 seconds
+                    timeout: 15000 // 15 second timeout
+                }
+            );
         }
-    );
-}
         
         async function triggerAnalysis(lat, lng) {
             selectedTarget = [lat, lng];
@@ -1378,7 +2224,7 @@ function searchCustomStartLocation(query) {
             sidebar.classList.add('active');
             routeLayer.clearLayers();
             document.getElementById('start-nav-btn').classList.add('hidden');
-    updateDestinationMarker(lat, lng);
+            updateDestinationMarker(lat, lng);
             
             document.getElementById('side-title').innerText = "Processing...";
             
@@ -1388,7 +2234,7 @@ function searchCustomStartLocation(query) {
                 
                 if (data.features && data.features.length > 0) {
                     const p = data.features[0].properties || {};
-            const locationName = p.name || p.street || "Selected Location";
+                    const locationName = p.name || p.street || "Selected Location";
                     document.getElementById('side-title').innerText = 
                         p.name || p.street || "Selected Location";
                     document.getElementById('sidebar-content').innerHTML = `
@@ -1404,7 +2250,7 @@ function searchCustomStartLocation(query) {
                         </div>
                     `;
 
-            updateDestinationMarker(lat, lng, locationName);
+                    updateDestinationMarker(lat, lng, locationName);
                 } else {
                     document.getElementById('side-title').innerText = "Location";
                     document.getElementById('sidebar-content').innerHTML = `
@@ -1441,75 +2287,618 @@ function searchCustomStartLocation(query) {
             calculateRoutes(getCurrentStartPoint(), [lat, lng]);
         }
         
-        async function calculateRoutes(start, end) {
-            const container = document.getElementById('route-options');
-            container.innerHTML = '<div class="text-xs text-neutral-500 p-4 text-center">Calculating routes...</div>';
-            
-            const distance = map.distance(start, end);
-            const routes = [];
-            
-            const trafficLevel = calculateTrafficLevel(start, end);
-
-            // Check if flight route should be shown
-            if (shouldShowFlightRoute(start, end, distance)) {
-                const flightRoute = await calculateFlightRoute(start, end, distance);
-                if (flightRoute) {
-                    routes.push(flightRoute);
+        // (Note: The calculateRoutes function has been updated above to use calculateRealRoutes)
+        
+        async function fetchGraphHopperRoute(start, end, mode) {
+            try {
+                // GraphHopper supports long distances better
+                const vehicle = mode === 'driving' ? 'car' : 
+                               mode === 'cycling' ? 'bike' : 'foot';
+                
+                const response = await fetch(
+                    `https://graphhopper.com/api/1/route?point=${start[0]},${start[1]}&point=${end[0]},${end[1]}&vehicle=${vehicle}&locale=en&instructions=true&points_encoded=false&key=demo`
+                );
+                
+                const data = await response.json();
+                
+                if (data.paths && data.paths.length > 0) {
+                    return {
+                        distance: data.paths[0].distance,
+                        duration: data.paths[0].time / 1000, // Convert ms to seconds
+                        geometry: {
+                            type: "LineString",
+                            coordinates: data.paths[0].points.coordinates
+                        },
+                        legs: []
+                    };
                 }
+                
+                throw new Error('GraphHopper no route');
+                
+            } catch (error) {
+                console.error(`GraphHopper ${mode} failed:`, error);
+                throw error; // Let caller handle
             }
+        }
 
-            const modes = [
-                { id: 'driving', icon: 'lucide:car', label: 'Driving' },
-                { id: 'cycling', icon: 'lucide:bike', label: 'Cycling' },
-                { id: 'walking', icon: 'lucide:footprints', label: 'Walking' }
-            ];
-            
-            for (const m of modes) {
-                try {
-                    const r = await fetch(`https://router.project-osrm.org/route/v1/${m.id}/${start[1]},${start[0]};${end[1]},${end[0]}?overview=full&geometries=geojson&steps=true&annotations=true`)
-                        .then(res => res.json());
+        async function getICOAirports() {
+            try {
+                // ICAO maintains a list of international airports
+                // Use multiple sources to get comprehensive list
+                
+                // Source 1: World Airport Codes (scraped data)
+                const response = await fetch('https://raw.githubusercontent.com/jpatokal/openflights/master/data/airports.dat');
+                const data = await response.text();
+                
+                const airports = [];
+                const lines = data.split('\n');
+                
+                for (const line of lines) {
+                    if (!line.trim()) continue;
                     
-                    if (r.routes?.[0]) {
-                        const route = {
-                            id: m.id,
-                            icon: m.icon,
-                            label: m.label,
-                            duration: r.routes[0].duration,
-                            distance: r.routes[0].distance,
-                            geometry: r.routes[0].geometry,
-                            legs: r.routes[0].legs,
-                            steps: processOSRMSteps(r.routes[0].legs?.[0]?.steps || []),
-                            fullRouteData: r.routes[0]
-                        };
+                    const fields = line.split(',');
+                    if (fields.length >= 14) {
+                        const name = fields[1].replace(/"/g, '');
+                        const city = fields[2].replace(/"/g, '');
+                        const country = fields[3].replace(/"/g, '');
+                        const iata = fields[4].replace(/"/g, '');
+                        const icao = fields[5].replace(/"/g, '');
+                        const lat = parseFloat(fields[6]);
+                        const lng = parseFloat(fields[7]);
                         
-                        if (m.id === 'driving') {
-                            route.traffic = trafficLevel;
-                            route.originalDuration = r.routes[0].duration;
-                            if (trafficLevel === 'high') {
-                                route.duration = route.duration * 1.4;
-                            } else if (trafficLevel === 'medium') {
-                                route.duration = route.duration * 1.2;
-                            }
+                        // Filter for significant airports
+                        if (iata && iata.length === 3 && 
+                            !isNaN(lat) && !isNaN(lng) &&
+                            // Exclude tiny/specialized airports
+                            (icao || name.includes('International') || name.includes('Airport'))) {
+                            
+                            airports.push({
+                                code: iata,
+                                icao: icao,
+                                name: name,
+                                city: city,
+                                country: country,
+                                coordinates: [lat, lng],
+                                size: estimateAirportSize(name, city, country)
+                            });
                         }
-                        
-                        routes.push(route);
                     }
-                } catch(e) {
-                    console.error(`Route calculation failed for ${m.id}:`, e);
                 }
+                
+                // Additional filtering to remove military/small airports
+                const filteredAirports = airports.filter(airport => {
+                    const name = airport.name.toLowerCase();
+                    const isMajor = (
+                        // Include international airports
+                        name.includes('international') ||
+                        // Include major city airports
+                        (airport.size === 'large' || airport.size === 'medium') ||
+                        // Include airports serving cities > 100k population
+                        isMajorCity(airport.city, airport.country)
+                    );
+                    
+                    const isMilitary = (
+                        name.includes('air force') ||
+                        name.includes('space force') ||
+                        name.includes('naval') ||
+                        name.includes('army') ||
+                        name.includes('military') ||
+                        name.includes('afb') ||
+                        name.includes('airbase') ||
+                        airport.code.includes('X') || // Many military codes end with X
+                        name.includes('air station')
+                    );
+                    
+                    return isMajor && !isMilitary;
+                });
+                
+                console.log(`Filtered to ${filteredAirports.length} major commercial airports`);
+                return filteredAirports;
+                
+            } catch (error) {
+                console.error("ICAO data failed:", error);
+                return getVerifiedCommercialAirports();
+            }
+        }
+
+        function estimateAirportSize(name, city, country) {
+            const nameLower = name.toLowerCase();
+            
+            if (nameLower.includes('international') || 
+                ['JFK', 'LAX', 'LHR', 'CDG', 'DXB', 'SIN', 'HND', 'PEK', 'PVG'].some(code => 
+                    name.includes(code))) {
+                return 'large';
             }
             
-            container.innerHTML = '';
-            if (routes.length === 0) {
-                container.innerHTML = '<div class="text-xs text-neutral-500 p-4 text-center">No routes available</div>';
-                return;
+            // Medium airports typically serve medium cities
+            if (nameLower.includes('regional') || 
+                nameLower.includes('municipal') ||
+                cityPopulationLookup(city, country) > 500000) {
+                return 'medium';
             }
             
-            routes.forEach(route => {
-                addRouteCard(route);
-            });
+            return 'small';
+        }
+
+        async function findBestAirportForRoute(startCoords, endCoords) {
+    const airports = await getCommercialAirports();
+    
+    // Find airports near start - PRIORITIZE MAJOR AIRPORTS
+    const startAirports = airports
+        .map(airport => ({
+            ...airport,
+            distance: map.distance(startCoords, airport.coordinates),
+            // Score based on size and distance
+            score: calculateAirportScore(airport, startCoords)
+        }))
+        .filter(a => a.distance < 150000) // Within 150km
+        .sort((a, b) => b.score - a.score); // Higher score first
+    
+    // Find airports near end
+    const endAirports = airports
+        .map(airport => ({
+            ...airport,
+            distance: map.distance(endCoords, airport.coordinates),
+            score: calculateAirportScore(airport, endCoords)
+        }))
+        .filter(a => a.distance < 150000)
+        .sort((a, b) => b.score - a.score);
+    
+    // Only suggest flight if we have decent airports
+    if (startAirports.length === 0 || endAirports.length === 0) {
+        return null;
+    }
+    
+    const startAirport = startAirports[0];
+    const endAirport = endAirports[0];
+    
+    // Don't suggest if airports are too close together
+    const airportDistance = map.distance(startAirport.coordinates, endAirport.coordinates);
+    if (airportDistance < 300000) { // Less than 300km
+        return null;
+    }
+    
+    return { start: startAirport, end: endAirport };
+}
+
+function calculateAirportScore(airport, userCoords) {
+    const distance = map.distance(userCoords, airport.coordinates);
+    
+    // Base score based on airport importance
+    let score = 0;
+    
+    // MAJOR INTERNATIONAL AIRPORTS get huge bonus
+    if (isMajorInternationalAirport(airport)) {
+        score += 500; // Large bonus for major airports
+    }
+    
+    // Size-based scoring
+    if (airport.size === 'large') score += 200;
+    else if (airport.size === 'medium') score += 100;
+    else if (airport.size === 'small') score += 50;
+    
+    // International designation bonus
+    if (airport.name.toLowerCase().includes('international')) {
+        score += 150;
+    }
+    
+    // Specific major airport codes get extra priority
+    const majorAirportCodes = ['SEA', 'JFK', 'LAX', 'ORD', 'DFW', 'LHR', 'CDG', 'FRA', 'AMS', 'HND', 'PEK', 'PVG'];
+    if (majorAirportCodes.includes(airport.code)) {
+        score += 300;
+    }
+    
+    // Distance penalty (closer is better, but not as important as airport size)
+    const distancePenalty = distance / 1000; // 1 point per km
+    score -= distancePenalty;
+    
+    return score;
+}
+
+function isMajorInternationalAirport(airport) {
+    // List of major international airport codes
+    const majorInternationalAirports = [
+        'ATL','LAX','ORD','DFW','DEN','JFK','SFO','SEA','LAS','MCO','MIA','CLT','EWR','PHX',
+'IAH','BOS','MSP','DTW','PHL','SAN','TPA','PDX','BWI','IAD','DCA','SJC','OAK',
+'AUS','SAT','DAL','HOU','CLE','CMH','CVG','IND','STL','MCI','SMF','SNA','ONT',
+'BUR','LGB','PSP','RNO','BOI','SLC','ABQ','ELP','TUS','OKC','TUL','OMA','DSM',
+'MSY','BTR','GPT','MOB','BHM','HSV','CHA','TYS','AVL','GSP','CAE','CHS','SAV',
+'JAX','RSW','PBI','FLL','EYW','ORF','RIC','ROA','LYH','GSO','RDU','ILM', 'YYZ','YVR','YUL','YYC','YEG','YOW','YWG','YHZ','YQB','YYT','YXE','YLW', 'MEX','CUN','GDL','MTY','TIJ','SJD','PVR','MZT','HMO','LAP','LHR','LGW','STN','LTN','MAN','EDI','GLA','BHX','BRS','DUB','SNN','ORK','CDG','ORY','NCE','LYS','MRS','TLS','BOD','AMS','BRU','CRL','MAD','BCN','PMI','AGP','ALC','SVQ','BIO','FCO','MXP','LIN','BGY','VCE','NAP','CTA','PMO','BLQ','FCO','MXP','LIN','BGY','VCE','NAP','CTA','PMO','BLQ','ZRH','GVA','BSL','VIE','SZG','INN','ARN','OSL','CPH','HEL','GOT','TRD','SVG','TMP','ATH','SKG','HER','CFU','BEG','ZAG','LJU','SJJ','TIA','SOF','IST','SAW','AYT','ADB','HND','NRT','KIX','ITM','NGO','FUK','CTS','OKA','PEK','PKX','PVG','SHA','CAN','SZX','CTU','XIY','HGH','NKG',
+'WUH','CSX','KMG','URC','TSN','CGO','ICN','GMP','PUS','CJU','SIN','HKG','BKK','DMK','HKT','CNX','DEL','BOM','BLR','MAA','HYD','CCU','COK','TRV','AMD','PNQ','KUL','PEN','CGK','DPS','SUB','MNL','CEB','DVO','TPE','KHH','SGN','HAN','DAD','DXB','DWC','AUH','SHJ','DOH','RUH','JED','DMM','KWI',
+'BAH','MCT','AMM','TLV','BEY','CAI','JNB','CPT','DUR','PLZ','LOS','ABV','ACC','ADD','NBO',
+'DAR','KGL','EBB','CMN','RAK','TUN','ALG','TIP','CAI','GRU','CGH','GIG','BSB','CNF','SSA','REC','FOR',
+'EZE','AEP','COR','MDZ','SCL','LIM','BOG','MDE',
+'UIO','GYE','CCS','PTY','MVD','ASU','LPB','VVI','SYD','MEL','BNE','PER','ADL','CBR','OOL','CNS',
+'AKL','WLG','CHC','ZQN','NAN','PPT'
+    ];
+    
+    return majorInternationalAirports.includes(airport.code) || 
+           airport.name.toLowerCase().includes('international') ||
+           airport.size === 'large';
+}
+
+        function getCommercialAirports() {
+            // Curated list of verified commercial airports
+            return [
+                // US Major Hubs
+                { code: "ATL", name: "Hartsfield-Jackson Atlanta International", city: "Atlanta", country: "USA", coordinates: [33.6407, -84.4277], size: "large" },
+                { code: "LAX", name: "Los Angeles International", city: "Los Angeles", country: "USA", coordinates: [33.9416, -118.4085], size: "large" },
+                { code: "ORD", name: "O'Hare International", city: "Chicago", country: "USA", coordinates: [41.9742, -87.9073], size: "large" },
+                { code: "DFW", name: "Dallas/Fort Worth International", city: "Dallas", country: "USA", coordinates: [32.8998, -97.0403], size: "large" },
+                { code: "DEN", name: "Denver International", city: "Denver", country: "USA", coordinates: [39.8561, -104.6737], size: "large" },
+                { code: "JFK", name: "John F. Kennedy International", city: "New York", country: "USA", coordinates: [40.6413, -73.7781], size: "large" },
+                { code: "SFO", name: "San Francisco International", city: "San Francisco", country: "USA", coordinates: [37.6213, -122.3790], size: "large" },
+                { code: "SEA", name: "Seattle-Tacoma International", city: "Seattle", country: "USA", coordinates: [47.4502, -122.3088], size: "large" },
+                { code: "LAS", name: "Harry Reid International", city: "Las Vegas", country: "USA", coordinates: [36.0840, -115.1537], size: "large" },
+                { code: "MCO", name: "Orlando International", city: "Orlando", country: "USA", coordinates: [28.4294, -81.3090], size: "large" },
+                
+                // US Regional (but still commercial)
+                { code: "PDX", name: "Portland International", city: "Portland", country: "USA", coordinates: [45.5887, -122.5975], size: "medium" },
+                { code: "AUS", name: "Austin-Bergstrom International", city: "Austin", country: "USA", coordinates: [30.1975, -97.6664], size: "medium" },
+                { code: "BNA", name: "Nashville International", city: "Nashville", country: "USA", coordinates: [36.1245, -86.6782], size: "medium" },
+                { code: "SLC", name: "Salt Lake City International", city: "Salt Lake City", country: "USA", coordinates: [40.7884, -111.9778], size: "medium" },
+                { code: "MSP", name: "Minneapolis-Saint Paul International", city: "Minneapolis", country: "USA", coordinates: [44.8820, -93.2218], size: "large" },
+                { code: "DTW", name: "Detroit Metropolitan", city: "Detroit", country: "USA", coordinates: [42.2124, -83.3534], size: "large" },
+                { code: "BOS", name: "Logan International", city: "Boston", country: "USA", coordinates: [42.3643, -71.0052], size: "large" },
+                { code: "MIA", name: "Miami International", city: "Miami", country: "USA", coordinates: [25.7959, -80.2870], size: "large" },
+                { code: "PHX", name: "Phoenix Sky Harbor International", city: "Phoenix", country: "USA", coordinates: [33.4343, -112.0081], size: "large" },
+                { code: "IAH", name: "George Bush Intercontinental", city: "Houston", country: "USA", coordinates: [29.9844, -95.3414], size: "large" },
+                
+                // Canada
+                { code: "YYZ", name: "Toronto Pearson International", city: "Toronto", country: "Canada", coordinates: [43.6777, -79.6248], size: "large" },
+                { code: "YVR", name: "Vancouver International", city: "Vancouver", country: "Canada", coordinates: [49.1947, -123.1792], size: "large" },
+                { code: "YUL", name: "Montréal-Trudeau International", city: "Montreal", country: "Canada", coordinates: [45.4706, -73.7408], size: "large" },
+                { code: "YYC", name: "Calgary International", city: "Calgary", country: "Canada", coordinates: [51.1215, -114.0076], size: "large" },
+                
+                // Europe - Major
+                { code: "LHR", name: "London Heathrow", city: "London", country: "UK", coordinates: [51.4700, -0.4543], size: "large" },
+                { code: "CDG", name: "Paris Charles de Gaulle", city: "Paris", country: "France", coordinates: [49.0097, 2.5479], size: "large" },
+                { code: "AMS", name: "Amsterdam Schiphol", city: "Amsterdam", country: "Netherlands", coordinates: [52.3086, 4.7639], size: "large" },
+                { code: "FRA", name: "Frankfurt Airport", city: "Frankfurt", country: "Germany", coordinates: [50.0333, 8.5706], size: "large" },
+                { code: "IST", name: "Istanbul Airport", city: "Istanbul", country: "Turkey", coordinates: [41.2622, 28.7425], size: "large" },
+                { code: "MAD", name: "Madrid Barajas", city: "Madrid", country: "Spain", coordinates: [40.4983, -3.5676], size: "large" },
+                { code: "FCO", name: "Rome Fiumicino", city: "Rome", country: "Italy", coordinates: [41.8045, 12.2508], size: "large" },
+                { code: "BCN", name: "Barcelona El Prat", city: "Barcelona", country: "Spain", coordinates: [41.2974, 2.0833], size: "large" },
+                { code: "MUC", name: "Munich Airport", city: "Munich", country: "Germany", coordinates: [48.3538, 11.7861], size: "large" },
+                { code: "ZRH", name: "Zurich Airport", city: "Zurich", country: "Switzerland", coordinates: [47.4647, 8.5492], size: "large" },
+                
+                // Asia - Major
+                { code: "PEK", name: "Beijing Capital International", city: "Beijing", country: "China", coordinates: [40.0799, 116.6031], size: "large" },
+                { code: "PVG", name: "Shanghai Pudong International", city: "Shanghai", country: "China", coordinates: [31.1434, 121.8052], size: "large" },
+                { code: "HND", name: "Tokyo Haneda", city: "Tokyo", country: "Japan", coordinates: [35.5494, 139.7798], size: "large" },
+                { code: "SIN", name: "Singapore Changi", city: "Singapore", country: "Singapore", coordinates: [1.3644, 103.9915], size: "large" },
+                { code: "ICN", name: "Seoul Incheon International", city: "Seoul", country: "South Korea", coordinates: [37.4602, 126.4407], size: "large" },
+                { code: "BKK", name: "Bangkok Suvarnabhumi", city: "Bangkok", country: "Thailand", coordinates: [13.6811, 100.7475], size: "large" },
+                { code: "DEL", name: "Delhi Indira Gandhi International", city: "Delhi", country: "India", coordinates: [28.5562, 77.1000], size: "large" },
+                { code: "DXB", name: "Dubai International", city: "Dubai", country: "UAE", coordinates: [25.2532, 55.3657], size: "large" },
+                { code: "HKG", name: "Hong Kong International", city: "Hong Kong", country: "China", coordinates: [22.3080, 113.9185], size: "large" },
+                
+                // Rest of World
+                { code: "SYD", name: "Sydney Kingsford Smith", city: "Sydney", country: "Australia", coordinates: [-33.9399, 151.1753], size: "large" },
+                { code: "MEL", name: "Melbourne Airport", city: "Melbourne", country: "Australia", coordinates: [-37.6733, 144.8433], size: "large" },
+                { code: "AKL", name: "Auckland Airport", city: "Auckland", country: "New Zealand", coordinates: [-37.0081, 174.7925], size: "large" },
+                { code: "GRU", name: "São Paulo Guarulhos", city: "São Paulo", country: "Brazil", coordinates: [-23.4356, -46.4731], size: "large" },
+                { code: "EZE", name: "Buenos Aires Ezeiza", city: "Buenos Aires", country: "Argentina", coordinates: [-34.8222, -58.5358], size: "large" },
+                { code: "JNB", name: "Johannesburg O.R. Tambo", city: "Johannesburg", country: "South Africa", coordinates: [-26.1392, 28.2460], size: "large" },
+                { code: "CAI", name: "Cairo International", city: "Cairo", country: "Egypt", coordinates: [30.1219, 31.4056], size: "large" },
+                { code: "TLV", name: "Ben Gurion Airport", city: "Tel Aviv", country: "Israel", coordinates: [32.0114, 34.8867], size: "large" }
+            ];
         }
         
+        function getMajorAirportsList() {
+            return [
+                // NORTH AMERICA
+                { code: "JFK", name: "John F. Kennedy International", coords: [40.6413, -73.7781], city: "New York" },
+                { code: "LAX", name: "Los Angeles International", coords: [33.9416, -118.4085], city: "Los Angeles" },
+                { code: "ORD", name: "O'Hare International", coords: [41.9742, -87.9073], city: "Chicago" },
+                { code: "DFW", name: "Dallas/Fort Worth International", coords: [32.8998, -97.0403], city: "Dallas" },
+                { code: "DEN", name: "Denver International", coords: [39.8561, -104.6737], city: "Denver" },
+                { code: "SFO", name: "San Francisco International", coords: [37.6213, -122.3790], city: "San Francisco" },
+                { code: "SEA", name: "Seattle-Tacoma International", coords: [47.4502, -122.3088], city: "Seattle" },
+                { code: "MIA", name: "Miami International", coords: [25.7959, -80.2870], city: "Miami" },
+                { code: "ATL", name: "Hartsfield-Jackson Atlanta", coords: [33.6407, -84.4277], city: "Atlanta" },
+                { code: "YYZ", name: "Toronto Pearson", coords: [43.6777, -79.6248], city: "Toronto" },
+                { code: "YVR", name: "Vancouver International", coords: [49.1947, -123.1792], city: "Vancouver" },
+                { code: "MEX", name: "Mexico City International", coords: [19.4363, -99.0721], city: "Mexico City" },
+                
+                // EUROPE
+                { code: "LHR", name: "London Heathrow", coords: [51.4700, -0.4543], city: "London" },
+                { code: "CDG", name: "Paris Charles de Gaulle", coords: [49.0097, 2.5479], city: "Paris" },
+                { code: "FRA", name: "Frankfurt Airport", coords: [50.0333, 8.5706], city: "Frankfurt" },
+                { code: "AMS", name: "Amsterdam Schiphol", coords: [52.3086, 4.7639], city: "Amsterdam" },
+                { code: "MAD", name: "Madrid Barajas", coords: [40.4983, -3.5676], city: "Madrid" },
+                { code: "FCO", name: "Rome Fiumicino", coords: [41.8045, 12.2508], city: "Rome" },
+                { code: "BCN", name: "Barcelona El Prat", coords: [41.2974, 2.0833], city: "Barcelona" },
+                { code: "ZRH", name: "Zurich Airport", coords: [47.4647, 8.5492], city: "Zurich" },
+                { code: "IST", name: "Istanbul Airport", coords: [41.2622, 28.7425], city: "Istanbul" },
+                { code: "DUB", name: "Dublin Airport", coords: [53.4213, -6.2701], city: "Dublin" },
+                
+                // ASIA
+                { code: "HND", name: "Tokyo Haneda", coords: [35.5494, 139.7798], city: "Tokyo" },
+                { code: "NRT", name: "Tokyo Narita", coords: [35.7647, 140.3864], city: "Tokyo" },
+                { code: "PEK", name: "Beijing Capital", coords: [40.0799, 116.6031], city: "Beijing" },
+                { code: "PVG", name: "Shanghai Pudong", coords: [31.1434, 121.8052], city: "Shanghai" },
+                { code: "HKG", name: "Hong Kong International", coords: [22.3080, 113.9185], city: "Hong Kong" },
+                { code: "SIN", name: "Singapore Changi", coords: [1.3644, 103.9915], city: "Singapore" },
+                { code: "BKK", name: "Bangkok Suvarnabhumi", coords: [13.6811, 100.7475], city: "Bangkok" },
+                { code: "DEL", name: "Delhi Indira Gandhi", coords: [28.5562, 77.1000], city: "Delhi" },
+                { code: "ICN", name: "Seoul Incheon", coords: [37.4602, 126.4407], city: "Seoul" },
+                { code: "DOH", name: "Doha Hamad International", coords: [25.2609, 51.6138], city: "Doha" },
+                
+                // AUSTRALIA/PACIFIC
+                { code: "SYD", name: "Sydney Kingsford Smith", coords: [-33.9399, 151.1753], city: "Sydney" },
+                { code: "MEL", name: "Melbourne Airport", coords: [-37.6733, 144.8433], city: "Melbourne" },
+                { code: "AKL", name: "Auckland Airport", coords: [-37.0081, 174.7925], city: "Auckland" },
+                
+                // SOUTH AMERICA
+                { code: "GRU", name: "São Paulo Guarulhos", coords: [-23.4356, -46.4731], city: "São Paulo" },
+                { code: "EZE", name: "Buenos Aires Ezeiza", coords: [-34.8222, -58.5358], city: "Buenos Aires" },
+                { code: "SCL", name: "Santiago Arturo Merino Benítez", coords: [-33.3930, -70.7858], city: "Santiago" },
+                { code: "LIM", name: "Lima Jorge Chávez", coords: [-12.0219, -77.1143], city: "Lima" },
+                
+                // AFRICA
+                { code: "JNB", name: "Johannesburg O.R. Tambo", coords: [-26.1392, 28.2460], city: "Johannesburg" },
+                { code: "CAI", name: "Cairo International", coords: [30.1219, 31.4056], city: "Cairo" },
+                { code: "ADD", name: "Addis Ababa Bole", coords: [8.9779, 38.7993], city: "Addis Ababa" },
+                { code: "MBA", name: "Mombasa Moi International", coords: [-4.0348, 39.5942], city: "Mombasa" },
+                
+                // MIDDLE EAST
+                { code: "DXB", name: "Dubai International", coords: [25.2532, 55.3657], city: "Dubai" },
+                { code: "AUH", name: "Abu Dhabi International", coords: [24.4330, 54.6511], city: "Abu Dhabi" },
+                { code: "RUH", name: "Riyadh King Khalid", coords: [24.9584, 46.6989], city: "Riyadh" },
+                { code: "TLV", name: "Tel Aviv Ben Gurion", coords: [32.0114, 34.8867], city: "Tel Aviv" }
+            ];
+        }
+        
+        async function findNearestMajorAirport(coords) {
+            const majorAirports = getMajorAirportsList();
+            
+            // Find airports sorted by distance
+            const airportsWithDistance = majorAirports.map(airport => {
+                const distance = map.distance(coords, airport.coords);
+                return { ...airport, distance };
+            });
+            
+            // Sort by distance
+            airportsWithDistance.sort((a, b) => a.distance - b.distance);
+            
+            // Filter out airports that are TOO far (>500km)
+            const nearbyAirports = airportsWithDistance.filter(a => a.distance <= 500000);
+            
+            if (nearbyAirports.length === 0) {
+                // No airport within 500km, return nothing (don't show flight option)
+                return null;
+            }
+            
+            return {
+                name: nearbyAirports[0].name,
+                code: nearbyAirports[0].code,
+                city: nearbyAirports[0].city,
+                coordinates: nearbyAirports[0].coords,
+                distance: nearbyAirports[0].distance
+            };
+        }
+
+        // Global cache for airport data
+        let airportCache = null;
+        const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
+
+        async function getAirportDatabase() {
+            // Return cached data if available
+            if (airportCache && (Date.now() - airportCache.timestamp) < CACHE_DURATION) {
+                return airportCache.data;
+            }
+            
+            try {
+                // Try OurAirports first (most reliable)
+                const airports = await getAllAirports();
+                
+                // Cache the results
+                airportCache = {
+                    timestamp: Date.now(),
+                    data: airports
+                };
+                
+                // Also save to localStorage for offline use
+                try {
+                    localStorage.setItem('airportData', JSON.stringify({
+                        timestamp: Date.now(),
+                        data: airports.slice(0, 5000) // Store first 5000 airports
+                    }));
+                } catch (e) {
+                    // localStorage might be full, that's okay
+                }
+                
+                return airports;
+                
+            } catch (error) {
+                console.error("Airport database failed, trying fallbacks...");
+                
+                // Try localStorage cache
+                try {
+                    const cached = JSON.parse(localStorage.getItem('airportData'));
+                    if (cached && cached.data) {
+                        return cached.data;
+                    }
+                } catch (e) {
+                    // localStorage failed
+                }
+                
+                // Final fallback: minimal essential airports
+                return getEssentialAirports();
+            }
+        }
+
+        async function findNearestAirport(coords, maxDistance = 200000) {
+            const airports = await getAirportDatabase();
+            const [lat, lng] = coords;
+            
+            let nearest = null;
+            let minDistance = Infinity;
+            
+            for (const airport of airports) {
+                const distance = map.distance([lat, lng], airport.coordinates);
+                
+                if (distance < minDistance && distance < maxDistance) {
+                    minDistance = distance;
+                    nearest = {
+                        ...airport,
+                        distance: distance
+                    };
+                }
+            }
+            
+            return nearest;
+        }
+
+        function getEssentialAirports() {
+            // Hand-picked list of major worldwide airports
+            return [
+                // NORTH AMERICA
+                { code: "ATL", name: "Hartsfield-Jackson Atlanta International", city: "Atlanta", country: "USA", coordinates: [33.6407, -84.4277] },
+                { code: "LAX", name: "Los Angeles International", city: "Los Angeles", country: "USA", coordinates: [33.9416, -118.4085] },
+                { code: "ORD", name: "O'Hare International", city: "Chicago", country: "USA", coordinates: [41.9742, -87.9073] },
+                { code: "DFW", name: "Dallas/Fort Worth International", city: "Dallas", country: "USA", coordinates: [32.8998, -97.0403] },
+                { code: "DEN", name: "Denver International", city: "Denver", country: "USA", coordinates: [39.8561, -104.6737] },
+                { code: "JFK", name: "John F. Kennedy International", city: "New York", country: "USA", coordinates: [40.6413, -73.7781] },
+                { code: "SFO", name: "San Francisco International", city: "San Francisco", country: "USA", coordinates: [37.6213, -122.3790] },
+                { code: "SEA", name: "Seattle-Tacoma International", city: "Seattle", country: "USA", coordinates: [47.4502, -122.3088] },
+                { code: "YYZ", name: "Toronto Pearson International", city: "Toronto", country: "Canada", coordinates: [43.6777, -79.6248] },
+                { code: "MEX", name: "Mexico City International", city: "Mexico City", country: "Mexico", coordinates: [19.4363, -99.0721] },
+                
+                // EUROPE
+                { code: "LHR", name: "London Heathrow", city: "London", country: "UK", coordinates: [51.4700, -0.4543] },
+                { code: "CDG", name: "Paris Charles de Gaulle", city: "Paris", country: "France", coordinates: [49.0097, 2.5479] },
+                { code: "AMS", name: "Amsterdam Schiphol", city: "Amsterdam", country: "Netherlands", coordinates: [52.3086, 4.7639] },
+                { code: "FRA", name: "Frankfurt Airport", city: "Frankfurt", country: "Germany", coordinates: [50.0333, 8.5706] },
+                { code: "IST", name: "Istanbul Airport", city: "Istanbul", country: "Turkey", coordinates: [41.2622, 28.7425] },
+                { code: "MAD", name: "Madrid Barajas", city: "Madrid", country: "Spain", coordinates: [40.4983, -3.5676] },
+                { code: "FCO", name: "Rome Fiumicino", city: "Rome", country: "Italy", coordinates: [41.8045, 12.2508] },
+                
+                // ASIA
+                { code: "PEK", name: "Beijing Capital International", city: "Beijing", country: "China", coordinates: [40.0799, 116.6031] },
+                { code: "HND", name: "Tokyo Haneda", city: "Tokyo", country: "Japan", coordinates: [35.5494, 139.7798] },
+                { code: "PVG", name: "Shanghai Pudong International", city: "Shanghai", country: "China", coordinates: [31.1434, 121.8052] },
+                { code: "DXB", name: "Dubai International", city: "Dubai", country: "UAE", coordinates: [25.2532, 55.3657] },
+                { code: "SIN", name: "Singapore Changi", city: "Singapore", country: "Singapore", coordinates: [1.3644, 103.9915] },
+                { code: "BKK", name: "Bangkok Suvarnabhumi", city: "Bangkok", country: "Thailand", coordinates: [13.6811, 100.7475] },
+                { code: "ICN", name: "Seoul Incheon International", city: "Seoul", country: "South Korea", coordinates: [37.4602, 126.4407] },
+                { code: "DEL", name: "Delhi Indira Gandhi International", city: "Delhi", country: "India", coordinates: [28.5562, 77.1000] },
+                
+                // OCEANIA
+                { code: "SYD", name: "Sydney Kingsford Smith", city: "Sydney", country: "Australia", coordinates: [-33.9399, 151.1753] },
+                { code: "MEL", name: "Melbourne Airport", city: "Melbourne", country: "Australia", coordinates: [-37.6733, 144.8433] },
+                { code: "AKL", name: "Auckland Airport", city: "Auckland", country: "New Zealand", coordinates: [-37.0081, 174.7925] },
+                
+                // SOUTH AMERICA
+                { code: "GRU", name: "São Paulo Guarulhos", city: "São Paulo", country: "Brazil", coordinates: [-23.4356, -46.4731] },
+                { code: "EZE", name: "Buenos Aires Ezeiza", city: "Buenos Aires", country: "Argentina", coordinates: [-34.8222, -58.5358] },
+                
+                // AFRICA
+                { code: "JNB", name: "Johannesburg O.R. Tambo", city: "Johannesburg", country: "South Africa", coordinates: [-26.1392, 28.2460] },
+                { code: "CAI", name: "Cairo International", city: "Cairo", country: "Egypt", coordinates: [30.1219, 31.4056] }
+            ];
+        }
+
+        // Update shouldShowFlightRoute to be more restrictive
+        function shouldShowFlightRoute(start, end, distance) {
+            // Don't show flight for very short distances
+            if (distance < 100000) return false; // Less than 100km
+            
+            // Don't show flight if origin and destination are in same city/metro area
+            if (distance < 300000) { // Less than 300km
+                // Check if both points are likely in same metro area
+                const startAirport = findNearestMajorAirport(start);
+                const endAirport = findNearestMajorAirport(end);
+                
+                if (startAirport && endAirport && startAirport.code === endAirport.code) {
+                    return false; // Same airport, no flight needed
+                }
+            }
+            
+            // Show flight for distances over 300km OR when airports are available
+            if (distance > 300000) return true;
+            
+            return false;
+        }
+
+        async function calculateFlightRoute(start, end, distance) {
+            // Only consider flight for significant distances
+            if (distance < 300000) return null; // Less than 300km
+            
+            const airports = await findBestAirportForRoute(start, end);
+            if (!airports) return null;
+            
+            const { start: startAirport, end: endAirport } = airports;
+            
+            // Calculate actual travel distances
+            const toAirportDistance = startAirport.distance;
+            const airportToAirportDistance = map.distance(startAirport.coordinates, endAirport.coordinates);
+            const fromAirportDistance = endAirport.distance;
+            
+            // Time calculations
+            const groundSpeed = 30000; // 30 km/h for ground transport
+            const flightSpeed = 800000; // 800 km/h for flight
+            const airportTime = 7200; // 2 hours for airport processes
+            
+            const toAirportTime = (toAirportDistance / groundSpeed) * 3600;
+            const flightTime = (airportToAirportDistance / flightSpeed) * 3600;
+            const fromAirportTime = (fromAirportDistance / groundSpeed) * 3600;
+            
+            const totalTime = toAirportTime + flightTime + fromAirportTime + airportTime;
+            
+            // Only suggest flight if it's significantly better than driving
+            const directDistance = map.distance(start, end);
+            const drivingTime = (directDistance / 80000) * 3600; // 80 km/h average
+            if (totalTime > drivingTime * 0.8) { // Less than 20% time saving
+                return null;
+            }
+            
+            return {
+                id: 'flight',
+                icon: 'lucide:plane',
+                label: 'Flight',
+                duration: totalTime,
+                distance: airportToAirportDistance,
+                geometry: createFlightPath(startAirport.coordinates, endAirport.coordinates),
+                steps: [
+                    {
+                        distance: toAirportDistance,
+                        duration: toAirportTime,
+                        maneuver: {
+                            instruction: `Travel to ${startAirport.code} Airport`,
+                            type: 'ground'
+                        }
+                    },
+                    {
+                        distance: airportToAirportDistance,
+                        duration: flightTime,
+                        maneuver: {
+                            instruction: `Fly from ${startAirport.code} to ${endAirport.code}`,
+                            type: 'flight'
+                        }
+                    },
+                    {
+                        distance: fromAirportDistance,
+                        duration: fromAirportTime,
+                        maneuver: {
+                            instruction: `Travel from ${endAirport.code} Airport to destination`,
+                            type: 'ground'
+                        }
+                    }
+                ],
+                airports: {
+                    departure: startAirport,
+                    arrival: endAirport
+                },
+                groundTransport: {
+                    toAirport: formatTime(toAirportTime),
+                    fromAirport: formatTime(fromAirportTime)
+                },
+                details: `${startAirport.name} → ${endAirport.name}`
+            };
+        }
+                        
         function processOSRMSteps(osrmSteps) {
             return osrmSteps.map((step, index) => {
                 const instruction = generateRealNavigationInstruction(step, index, osrmSteps);
@@ -1530,145 +2919,6 @@ function searchCustomStartLocation(query) {
             });
         }
 
-        function shouldShowFlightRoute(start, end, distance) {
-            // Show flight for distances over 300km
-            if (distance > 300000) return true;
-            
-            // Also show flight if both points are near major airports
-            const majorAirports = getMajorAirportsList();
-            
-            const isNearAirportStart = majorAirports.some(airport => 
-                map.distance(start, airport.coords) < 50000
-            );
-            
-            const isNearAirportEnd = majorAirports.some(airport => 
-                map.distance(end, airport.coords) < 50000
-            );
-            
-            return isNearAirportStart && isNearAirportEnd;
-        }
-        
-        function getMajorAirportsList() {
-            return [
-                { code: "JFK", name: "John F. Kennedy International", coords: [40.6413, -73.7781], city: "New York" },
-                { code: "LAX", name: "Los Angeles International", coords: [33.9416, -118.4085], city: "Los Angeles" },
-                { code: "ORD", name: "O'Hare International", coords: [41.9742, -87.9073], city: "Chicago" },
-                { code: "DFW", name: "Dallas/Fort Worth International", coords: [32.8998, -97.0403], city: "Dallas" },
-                { code: "DEN", name: "Denver International", coords: [39.8561, -104.6737], city: "Denver" },
-                { code: "SFO", name: "San Francisco International", coords: [37.6213, -122.3790], city: "San Francisco" },
-                { code: "SEA", name: "Seattle-Tacoma International", coords: [47.4502, -122.3088], city: "Seattle" },
-                { code: "MIA", name: "Miami International", coords: [25.7959, -80.2870], city: "Miami" },
-                { code: "ATL", name: "Hartsfield-Jackson Atlanta", coords: [33.6407, -84.4277], city: "Atlanta" },
-                { code: "LHR", name: "London Heathrow", coords: [51.4700, -0.4543], city: "London" },
-                { code: "CDG", name: "Charles de Gaulle", coords: [49.0097, 2.5479], city: "Paris" },
-                { code: "FRA", name: "Frankfurt Airport", coords: [50.0333, 8.5706], city: "Frankfurt" },
-                { code: "AMS", name: "Amsterdam Schiphol", coords: [52.3086, 4.7639], city: "Amsterdam" },
-                { code: "DXB", name: "Dubai International", coords: [25.2532, 55.3657], city: "Dubai" },
-                { code: "HND", name: "Tokyo Haneda", coords: [35.5494, 139.7798], city: "Tokyo" },
-                { code: "PEK", name: "Beijing Capital", coords: [40.0799, 116.6031], city: "Beijing" },
-                { code: "SYD", name: "Sydney Kingsford Smith", coords: [-33.9399, 151.1753], city: "Sydney" },
-                { code: "YYZ", name: "Toronto Pearson", coords: [43.6777, -79.6248], city: "Toronto" },
-                { code: "MAD", name: "Madrid Barajas", coords: [40.4983, -3.5676], city: "Madrid" },
-                { code: "FCO", name: "Rome Fiumicino", coords: [41.8045, 12.2508], city: "Rome" }
-            ];
-        }
-        
-        async function calculateFlightRoute(start, end, distance) {
-            try {
-                // Get REAL major airports (not random airstrips)
-                const startAirport = await findNearestMajorAirport(start);
-                const endAirport = await findNearestMajorAirport(end);
-                
-                // Calculate flight time (average 800 km/h)
-                const flightHours = distance / 800000;
-                const flightMinutes = Math.round(flightHours * 60);
-                const totalFlightTime = flightHours * 3600; // in seconds
-                
-                // Add airport transfer time (2 hours for check-in, security, etc.)
-                const totalDuration = totalFlightTime + 7200;
-                
-                // Generate airport description
-                const startDesc = startAirport.code ? 
-                    `${startAirport.code} (${startAirport.name})` : 
-                    "nearest airport";
-                
-                const endDesc = endAirport.code ? 
-                    `${endAirport.code} (${endAirport.name})` : 
-                    "destination airport";
-                
-                // Generate booking links with REAL airport codes
-                const bookingLinks = generateFlightBookingLinks(startAirport, endAirport);
-                
-                return {
-                    id: 'flight',
-                    icon: 'lucide:plane',
-                    label: 'Flight',
-                    duration: totalDuration,
-                    distance: distance,
-                    geometry: createFlightPath(startAirport.coordinates || start, endAirport.coordinates || end),
-                    steps: [
-                        {
-                            distance: distance,
-                            duration: totalDuration,
-                            maneuver: {
-                                instruction: `Fly from ${startDesc} to ${endDesc}`,
-                                type: 'depart'
-                            }
-                        }
-                    ],
-                    bookingLinks: bookingLinks,
-                    flightTime: flightMinutes,
-                    airports: {
-                        departure: startAirport,
-                        arrival: endAirport
-                    },
-                    description: `${startDesc} → ${endDesc}`,
-                    details: `Flight from ${startAirport.city || 'origin'} to ${endAirport.city || 'destination'}`
-                };
-            } catch (error) {
-                console.error("Flight route calculation failed:", error);
-                return null;
-            }
-        }
-        
-        async function findNearestMajorAirport(coords) {
-            const majorAirports = getMajorAirportsList();
-            
-            // Find the closest major airport
-            let closestAirport = majorAirports[0];
-            let minDistance = map.distance(coords, closestAirport.coords);
-            
-            for (const airport of majorAirports) {
-                const distance = map.distance(coords, airport.coords);
-                if (distance < minDistance && distance < 200000) { // Within 200km
-                    minDistance = distance;
-                    closestAirport = airport;
-                }
-            }
-            
-            // If no airport within 200km, return the closest one anyway
-            if (minDistance > 200000) {
-                // Recalculate absolute closest
-                closestAirport = majorAirports[0];
-                minDistance = map.distance(coords, closestAirport.coords);
-                for (const airport of majorAirports) {
-                    const distance = map.distance(coords, airport.coords);
-                    if (distance < minDistance) {
-                        minDistance = distance;
-                        closestAirport = airport;
-                    }
-                }
-            }
-            
-            return {
-                name: closestAirport.name,
-                code: closestAirport.code,
-                city: closestAirport.city,
-                coordinates: closestAirport.coords,
-                distance: minDistance
-            };
-        }
-        
         function generateFlightBookingLinks(departure, arrival) {
             const links = [];
             
@@ -1741,11 +2991,11 @@ function searchCustomStartLocation(query) {
         }
         
         function formatDistanceForInstructions(distance) {
-            if (distance < 50) return "soon";
-            if (distance < 100) return "in 100 m";
-            if (distance < 200) return "in 200 m";
-            if (distance < 500) return "in 500 m";
-            if (distance < 1000) return "in " + Math.round(distance/100)*100 + " m";
+            if (distance < 50) return "Soon";
+            if (distance < 100) return "In 100 m";
+            if (distance < 200) return "In 200 m";
+            if (distance < 500) return "In 500 m";
+            if (distance < 1000) return "In " + Math.round(distance/100)*100 + " m";
             return "in " + (distance/1000).toFixed(1) + " km";
         }
         
@@ -1795,31 +3045,43 @@ function searchCustomStartLocation(query) {
                 trafficIndicator = `<span class="traffic-indicator ${trafficClass}"></span>`;
             }
 
-            if (route.id === 'flight') {
-                const flightTime = route.flightTime || Math.round(route.duration / 60);
-                const bookingLinksHTML = route.bookingLinks ? route.bookingLinks.map(link => 
-                    `<a href="${link.url}" target="_blank" class="inline-flex items-center gap-1 text-[8px] text-sky-400 hover:text-sky-300 mr-3">
-                        <iconify-icon icon="${link.icon}" class="text-[10px]"></iconify-icon>
-                        ${link.name}
-                    </a>`
-                ).join('') : '';
-                
-                div.innerHTML = `
-                    <div class="flex items-center gap-4">
-                        <iconify-icon icon="${route.icon}" class="text-2xl text-sky-500"></iconify-icon>
-                        <div class="flex-1">
-                            <div class="flex justify-between items-center">
-                                <div class="text-[10px] font-bold text-white">Flight Route</div>
-                                <div class="text-[9px] font-bold text-sky-400">${(route.distance/1000).toFixed(0)} km</div>
-                            </div>
-                            <div class="text-[9px] text-sky-300 mb-1">${route.description || "Flight available"}</div>
-                            <div class="text-[9px] text-neutral-400 uppercase">${flightTime} min flight • ${formatTime(route.duration)} total</div>
-                            <div class="mt-2 pt-2 border-t border-white/10 flex flex-wrap gap-2">
-                                ${bookingLinksHTML}
-                            </div>
+                if (route.id === 'flight') {
+        // GENERATE BOOKING LINKS FOR FLIGHTS
+        const bookingLinks = generateFlightBookingLinks(
+            route.airports?.departure || {code: "???", city: "origin"}, 
+            route.airports?.arrival || {code: "???", city: "destination"}
+        );
+        
+        // Create HTML for booking links
+        const bookingLinksHTML = bookingLinks.map(link => 
+            `<a href="${link.url}" target="_blank" class="inline-flex items-center gap-1 text-[8px] text-sky-400 hover:text-sky-300 mr-3 border border-sky-400/30 rounded px-2 py-1 hover:bg-sky-400/10 transition-colors">
+                <iconify-icon icon="${link.icon}" class="text-[10px]"></iconify-icon>
+                ${link.name}
+            </a>`
+        ).join('');
+        
+        const totalTime = formatTime(route.duration);
+        const flightTime = formatTime(route.flightTime || (route.duration * 0.6));
+        
+        div.innerHTML = `
+            <div class="flex items-center gap-4">
+                <iconify-icon icon="${route.icon}" class="text-2xl text-sky-500"></iconify-icon>
+                <div class="flex-1">
+                    <div class="flex justify-between items-center">
+                        <div class="text-[10px] font-bold text-white">Flight Route</div>
+                        <div class="text-[9px] font-bold text-sky-400">${(route.distance/1000).toFixed(0)} km</div>
+                    </div>
+                    <div class="text-[9px] text-sky-300 mb-1">${route.details || "Direct flight"}</div>
+                    <div class="text-[9px] text-neutral-400 uppercase">${flightTime} flight • ${totalTime} total</div>
+                    <div class="mt-2 pt-2 border-t border-white/10">
+                        <div class="text-[8px] text-neutral-500 uppercase mb-1">Book Travel:</div>
+                        <div class="flex flex-wrap gap-1">
+                            ${bookingLinksHTML}
                         </div>
-                    </div>`;
-            } else {
+                    </div>
+                </div>
+            </div>`;
+    } else {
                 div.innerHTML = `
                     <div class="flex items-center gap-4">
                         <iconify-icon icon="${route.icon}" class="text-xl text-neutral-500"></iconify-icon>
@@ -1892,7 +3154,6 @@ function searchCustomStartLocation(query) {
             startBtn.onclick = () => startActiveNav(route);
         }
         
-        // --- REAL NAVIGATION ---
         function startActiveNav(route) {
             isNavigating = true;
             currentNavRoute = route;
@@ -1918,8 +3179,435 @@ function searchCustomStartLocation(query) {
             // Update bottom HUD with ETA and distance
             updateNavigationHUD();
             
-            // Center map on route
-            map.fitBounds(getRouteBounds(route.geometry), { padding: [50, 50] });
+            // **GOOGLE/APPLE-STYLE NAVIGATION CAMERA**
+            setupNavigationCamera(route);
+            
+            // Start navigation updates
+            startNavigationUpdates();
+        }
+
+        function setupNavigationCamera(route) {
+            if (!route || !route.geometry) return;
+            
+            // Get the route coordinates
+            const coords = route.geometry.coordinates;
+            if (coords.length < 2) return;
+            
+            // Convert to LatLng objects
+            const latLngs = coords.map(coord => L.latLng(coord[1], coord[0]));
+            
+            // Calculate initial camera position
+            const startPoint = getCurrentStartPoint();
+            const startLatLng = L.latLng(startPoint[0], startPoint[1]);
+            
+            // Find the closest point on route to start
+            let closestIndex = 0;
+            let minDistance = Infinity;
+            
+            for (let i = 0; i < latLngs.length; i++) {
+                const distance = startLatLng.distanceTo(latLngs[i]);
+                if (distance < minDistance) {
+                    minDistance = distance;
+                    closestIndex = i;
+                }
+            }
+            
+            // Look ahead 5 points for direction
+            const lookAheadIndex = Math.min(closestIndex + 5, latLngs.length - 1);
+            
+            // Calculate bearing (direction)
+            const bearing = calculateBearing(
+                latLngs[closestIndex],
+                latLngs[lookAheadIndex]
+            );
+            
+            // Set up navigation view
+            map.flyTo(latLngs[closestIndex], 18, {
+                animate: true,
+                duration: 1,
+                easeLinearity: 0.25
+            });
+            
+            // Store for navigation updates
+            window.navigationCamera = {
+                routePoints: latLngs,
+                currentIndex: closestIndex,
+                bearing: bearing
+            };
+            
+            // Add route line with arrow markers
+            showNavigationRoute(route);
+        }
+
+        function calculateBearing(point1, point2) {
+            const lat1 = point1.lat * Math.PI / 180;
+            const lat2 = point2.lat * Math.PI / 180;
+            const lon1 = point1.lng * Math.PI / 180;
+            const lon2 = point2.lng * Math.PI / 180;
+            
+            const y = Math.sin(lon2 - lon1) * Math.cos(lat2);
+            const x = Math.cos(lat1) * Math.sin(lat2) -
+                      Math.sin(lat1) * Math.cos(lat2) * Math.cos(lon2 - lon1);
+            
+            let bearing = Math.atan2(y, x) * 180 / Math.PI;
+            bearing = (bearing + 360) % 360;
+            
+            return bearing;
+        }
+
+        function showNavigationRoute(route) {
+            // Clear existing route
+            routeLayer.clearLayers();
+            
+            // Clear existing arrows
+            if (window.routeArrows) {
+                window.routeArrows.clearLayers();
+            } else {
+                window.routeArrows = L.layerGroup().addTo(map);
+            }
+            
+            // Draw route with proper styling
+            const routeLine = L.geoJSON(route.geometry, {
+                style: {
+                    color: '#3b82f6',
+                    weight: 8,
+                    opacity: 0.8,
+                    lineCap: 'round',
+                    lineJoin: 'round',
+                    className: 'nav-route-line'
+                }
+            }).addTo(routeLayer);
+            
+            // Add outline for better visibility
+            const routeOutline = L.geoJSON(route.geometry, {
+                style: {
+                    color: 'white',
+                    weight: 12,
+                    opacity: 0.5,
+                    lineCap: 'round',
+                    lineJoin: 'round',
+                    className: 'nav-route-outline'
+                }
+            }).addTo(routeLayer);
+            
+            // Add direction arrows
+            addDirectionArrows(route.geometry);
+            
+            // Add start and end markers
+            addNavigationMarkers(route);
+            
+            // Add user position marker
+            addUserPositionMarker();
+        }
+
+        function addDirectionArrows(geometry) {
+            const coords = geometry.coordinates;
+            const arrowCount = Math.min(30, Math.floor(coords.length / 5));
+            
+            // Clear existing arrows first
+            if (window.routeArrows) {
+                window.routeArrows.clearLayers();
+            } else {
+                window.routeArrows = L.layerGroup().addTo(map);
+            }
+            
+            for (let i = 0; i < arrowCount; i++) {
+                const index = Math.floor(i * (coords.length / arrowCount));
+                if (index >= coords.length - 1) continue;
+                
+                const start = coords[index];
+                const end = coords[Math.min(index + 1, coords.length - 1)];
+                
+                // Calculate direction
+                const bearing = calculateBearing(
+                    L.latLng(start[1], start[0]),
+                    L.latLng(end[1], end[0])
+                );
+                
+                // Create arrow icon with better visibility
+                const arrowIcon = L.divIcon({
+                    className: 'nav-arrow-icon',
+                    html: `
+                        <div style="
+                            position: relative;
+                            width: 24px;
+                            height: 24px;
+                            transform: rotate(${bearing}deg);
+                        ">
+                            <div style="
+                                position: absolute;
+                                width: 0;
+                                height: 0;
+                                border-left: 8px solid transparent;
+                                border-right: 8px solid transparent;
+                                border-bottom: 12px solid #3b82f6;
+                                top: 0;
+                                left: 4px;
+                                filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+                            "></div>
+                            <div style="
+                                position: absolute;
+                                width: 4px;
+                                height: 10px;
+                                background: #3b82f6;
+                                top: 12px;
+                                left: 10px;
+                                border-radius: 2px;
+                            "></div>
+                        </div>
+                    `,
+                    iconSize: [24, 24],
+                    iconAnchor: [12, 12]
+                });
+                
+                L.marker([start[1], start[0]], { 
+                    icon: arrowIcon,
+                    zIndexOffset: 1000
+                }).addTo(window.routeArrows);
+            }
+        }
+
+        function addNavigationMarkers(route) {
+            // Start marker (if custom start)
+            if (customStartMode !== 'current' && customStartPos) {
+                const startIcon = L.divIcon({
+                    className: 'nav-start-marker',
+                    html: '<div style="background: #10b981; width: 12px; height: 12px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 8px rgba(16, 185, 129, 0.7);"></div>',
+                    iconSize: [16, 16],
+                    iconAnchor: [8, 8]
+                });
+                
+                L.marker(customStartPos, { icon: startIcon })
+                    .addTo(routeLayer)
+                    .bindPopup('Start point');
+            }
+            
+            // End marker
+            if (selectedTarget) {
+                const endIcon = L.divIcon({
+                    className: 'nav-end-marker',
+                    html: '<div style="background: #ef4444; width: 16px; height: 16px; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 10px rgba(239, 68, 68, 0.7); position: relative;"><div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 6px; height: 6px; background: white; border-radius: 50%;"></div></div>',
+                    iconSize: [22, 22],
+                    iconAnchor: [11, 11]
+                });
+                
+                L.marker(selectedTarget, { icon: endIcon })
+                    .addTo(routeLayer)
+                    .bindPopup('Destination');
+            }
+        }
+
+        function startNavigationUpdates() {
+            // Clear any existing interval
+            if (window.navUpdateInterval) {
+                clearInterval(window.navUpdateInterval);
+            }
+            
+            let isUserMovingMap = false;
+            let mapMoveTimeout;
+            
+            // Track when user is moving the map
+            map.on('movestart', () => {
+                isUserMovingMap = true;
+                clearTimeout(mapMoveTimeout);
+            });
+            
+            map.on('moveend', () => {
+                // Wait a bit before allowing auto-recenter
+                mapMoveTimeout = setTimeout(() => {
+                    isUserMovingMap = false;
+                }, 3000); // 3 second delay after user stops moving
+            });
+            
+            // Update navigation camera periodically
+            window.navUpdateInterval = setInterval(() => {
+                if (!isNavigating || !window.navigationCamera || isUserMovingMap) {
+                    return; // Don't auto-recenter if user is moving map
+                }
+                
+                const camera = window.navigationCamera;
+                const userPos = getCurrentUserPosition();
+                
+                if (!userPos) return;
+                
+                const userLatLng = L.latLng(userPos[0], userPos[1]);
+                
+                // Find closest point on route
+                let closestIndex = 0;
+                let minDistance = Infinity;
+                
+                const searchStart = Math.max(0, camera.currentIndex - 20);
+                const searchEnd = Math.min(camera.currentIndex + 50, camera.routePoints.length);
+                
+                for (let i = searchStart; i < searchEnd; i++) {
+                    const distance = userLatLng.distanceTo(camera.routePoints[i]);
+                    if (distance < minDistance) {
+                        minDistance = distance;
+                        closestIndex = i;
+                    }
+                }
+                
+                // Only update if user has moved significantly
+                if (minDistance > 50 && Math.abs(closestIndex - camera.currentIndex) > 5) {
+                    camera.currentIndex = closestIndex;
+                    
+                    // Look ahead for direction
+                    const lookAhead = Math.min(closestIndex + 15, camera.routePoints.length - 1);
+                    
+                    // Smooth camera movement (only pan, don't zoom)
+                    if (lookAhead > closestIndex) {
+                        const targetPoint = camera.routePoints[closestIndex];
+                        const currentCenter = map.getCenter();
+                        const distanceToCenter = targetPoint.distanceTo(currentCenter);
+                        
+                        // Only move camera if user is far from center
+                        if (distanceToCenter > 500) { // 500 meters
+                            map.panTo(targetPoint, {
+                                animate: true,
+                                duration: 1,
+                                easeLinearity: 0.25,
+                                noMoveStart: true
+                            });
+                        }
+                        
+                        // Update bearing
+                        camera.bearing = calculateBearing(
+                            camera.routePoints[closestIndex],
+                            camera.routePoints[lookAhead]
+                        );
+                    }
+                }
+                
+                // Update route highlighting based on progress
+                updateRouteHighlighting(camera.currentIndex, camera.routePoints.length);
+                
+            }, 2000); // Update every 2 seconds (slower to be less intrusive)
+        }
+
+        function updateRouteHighlighting(currentIndex, totalPoints) {
+            if (!currentNavRoute || !currentNavRoute.geometry) return;
+            
+            const progress = currentIndex / totalPoints;
+            
+            // Update the route line to show progress
+            routeLayer.clearLayers();
+            
+            // Draw completed portion in different color
+            drawRouteProgress(currentNavRoute.geometry, progress);
+        }
+
+        function drawRouteProgress(geometry, progress) {
+            const coords = geometry.coordinates;
+            const splitIndex = Math.floor(coords.length * progress);
+            
+            // Completed portion
+            if (splitIndex > 1) {
+                const completedCoords = coords.slice(0, splitIndex);
+                const completedGeoJSON = {
+                    type: "LineString",
+                    coordinates: completedCoords
+                };
+                
+                L.geoJSON(completedGeoJSON, {
+                    style: {
+                        color: '#10b981', // Green for completed
+                        weight: 6,
+                        opacity: 0.9,
+                        lineCap: 'round',
+                        lineJoin: 'round'
+                    }
+                }).addTo(routeLayer);
+            }
+            
+            // Remaining portion
+            if (splitIndex < coords.length - 1) {
+                const remainingCoords = coords.slice(splitIndex);
+                const remainingGeoJSON = {
+                    type: "LineString",
+                    coordinates: remainingCoords
+                };
+                
+                L.geoJSON(remainingGeoJSON, {
+                    style: {
+                        color: '#3b82f6', // Blue for remaining
+                        weight: 6,
+                        opacity: 0.7,
+                        lineCap: 'round',
+                        lineJoin: 'round',
+                        dashArray: '10, 5' // Dashed for remaining
+                    }
+                }).addTo(routeLayer);
+            }
+            
+            // Re-add arrows on remaining portion
+            addDirectionArrows({
+                type: "LineString",
+                coordinates: coords.slice(splitIndex)
+            });
+            
+            // Add user position marker
+            addUserPositionMarker();
+        }
+
+        function addUserPositionMarker() {
+            // Remove existing user nav marker
+            if (window.userNavMarker) {
+                map.removeLayer(window.userNavMarker);
+            }
+            
+            const userPos = getCurrentUserPosition();
+            if (!userPos) return;
+            
+            // Create navigation-style user marker
+            const userIcon = L.divIcon({
+                className: 'nav-user-marker',
+                html: `
+                    <div style="
+                        position: relative;
+                        width: 32px;
+                        height: 32px;
+                    ">
+                        <div style="
+                            position: absolute;
+                            width: 24px;
+                            height: 24px;
+                            background: #3b82f6;
+                            border-radius: 50%;
+                            border: 3px solid white;
+                            box-shadow: 0 0 15px rgba(59, 130, 246, 0.7);
+                            top: 0;
+                            left: 0;
+                        "></div>
+                        <div style="
+                            position: absolute;
+                            width: 0;
+                            height: 0;
+                            border-left: 6px solid transparent;
+                            border-right: 6px solid transparent;
+                            border-top: 12px solid #3b82f6;
+                            top: 22px;
+                            left: 10px;
+                            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+                        "></div>
+                    </div>
+                `,
+                iconSize: [32, 32],
+                iconAnchor: [16, 16]
+            });
+            
+            window.userNavMarker = L.marker(userPos, {
+                icon: userIcon,
+                zIndexOffset: 2000
+            }).addTo(map);
+        }
+
+        function getCurrentUserPosition() {
+            if (customStartMode === 'current') {
+                return userPos;
+            } else if (customStartPos) {
+                return customStartPos;
+            }
+            return userPos;
         }
         
         function transformSidebarToDirections(route) {
@@ -1978,6 +3666,63 @@ function searchCustomStartLocation(query) {
             });
         }
         
+        async function checkFerryRouteFree(start, end) {
+            const distance = map.distance(start, end);
+            
+            // Only check for ferry on water crossings
+            if (distance < 10000 || distance > 500000) return { hasFerry: false }; // 10km to 500km
+            
+            // Use OpenStreetMap Nominatim to check if points are separated by water
+            try {
+                // Get water/land data from OpenStreetMap
+                const [startWater, endWater] = await Promise.all([
+                    isPointOverWater(start),
+                    isPointOverWater(end)
+                ]);
+                
+                if (startWater && endWater) {
+                    // Both points in water - could be ferry route
+                    const ferryTime = (distance / 40000) * 3600; // 40 km/h ferry speed
+                    
+                    return {
+                        hasFerry: true,
+                        duration: ferryTime + 1800, // +30 min boarding
+                        distance: distance,
+                        description: "Possible ferry route",
+                        details: "Check local ferry schedules"
+                    };
+                }
+                
+            } catch (error) {
+                console.error("Ferry check failed:", error);
+            }
+            
+            return { hasFerry: false };
+        }
+
+        async function isPointOverWater(coords) {
+            try {
+                // Use OpenStreetMap's water/land data via Overpass API
+                const [lat, lng] = coords;
+                const query = `
+                    [out:json][timeout:5];
+                    (
+                        way["natural"="water"](around:1000, ${lat}, ${lng});
+                        relation["natural"="water"](around:1000, ${lat}, ${lng});
+                    );
+                    out body;
+                `;
+                
+                const response = await fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`);
+                const data = await response.json();
+                
+                return data.elements && data.elements.length > 0;
+                
+            } catch (error) {
+                return false;
+            }
+        }
+
         function checkNavigationProgress(position) {
             if (!isNavigating || !currentNavRoute || !currentNavRoute.steps) return;
             
@@ -2207,16 +3952,17 @@ function searchCustomStartLocation(query) {
             const container = document.getElementById('results');
             const filters = document.getElementById('filters');
             
-                if (recentSearches.length === 0) {
-        // Still show filters even with no recent searches
-        filters.classList.add('show');
-        filters.classList.remove('hidden');
-        
-        container.innerHTML = '<div class="text-xs text-neutral-500 p-4 text-center">No recent searches</div>';
-        container.classList.add('show');
-        container.classList.remove('hidden');
-        return;
-    }
+            if (recentSearches.length === 0) {
+                // Still show filters even with no recent searches
+                filters.classList.add('show');
+                filters.classList.remove('hidden');
+                
+                container.innerHTML = '<div class="text-xs text-neutral-500 p-4 text-center">No recent searches</div>';
+                container.classList.add('show');
+                container.classList.remove('hidden');
+                return;
+            }
+            
             filters.classList.remove('hidden');
             
             let html = `
@@ -2281,60 +4027,133 @@ function searchCustomStartLocation(query) {
             displaySearchResults(filteredResults);
         }
 
-function generateRealNavigationInstruction(step, index, allSteps) {
-    if (!step.maneuver) return "Continue on current road";
-    
-    const distance = step.distance;
-    const streetName = step.name || ""; // Use ACTUAL street name from OSRM
-    
-    // Format distance like Google Maps
-    let distanceText = formatDistanceForInstructions(distance);
-    
-    // Get CLEAN instruction from OSRM
-    let instruction = step.maneuver.instruction || "";
-    
-    // Clean up OSRM's HTML tags and format
-    instruction = instruction
-        .replace(/<[^>]*>/g, '') // Remove all HTML tags
-        .replace(/  +/g, ' ')    // Remove extra spaces
-        .trim();
-    
-    // If OSRM gave us a decent instruction, use it
-    if (instruction && instruction.length > 10) {
-        return instruction;
-    }
-    
-    // Otherwise generate from maneuver type with REAL data
-    switch(step.maneuver.type) {
-        case 'depart':
-            return `Head ${streetName ? 'on ' + streetName : 'toward destination'}`;
-        case 'turn':
-            if (step.maneuver.modifier) {
-                return `${capitalizeFirst(step.maneuver.modifier)} ${distanceText}${streetName ? ' onto ' + streetName : ''}`;
+        function generateRealNavigationInstruction(step, index, allSteps) {
+            if (!step.maneuver) return "Continue";
+            
+            const distance = step.distance;
+            const streetName = step.name || getStreetName(step);
+            const maneuverType = step.maneuver.type;
+            const modifier = step.maneuver.modifier || '';
+            
+            // Google-style distance formatting
+            let distanceText = "";
+            if (distance < 20) {
+                distanceText = "";
+            } else if (distance < 100) {
+                distanceText = " soon";
+            } else if (distance < 1000) {
+                const rounded = Math.round(distance / 50) * 50;
+                distanceText = ` in ${rounded}m`;
+            } else {
+                distanceText = ` in ${(distance / 1000).toFixed(1)} km`;
             }
-            return `Turn ${distanceText}${streetName ? ' onto ' + streetName : ''}`;
-        case 'continue':
-            return streetName ? 
-                `Continue on ${streetName} ${distanceText}` : 
-                `Continue straight ${distanceText}`;
-        case 'arrive':
-            return index === 0 ? "You have arrived" : `Arrive at destination`;
-        case 'roundabout':
-            return `Enter roundabout${streetName ? ' at ' + streetName : ''}`;
-        case 'merge':
-            return `Merge ${distanceText}${streetName ? ' onto ' + streetName : ''}`;
-        case 'fork':
-            return `Keep ${step.maneuver.modifier || 'left'} ${distanceText}`;
-        case 'off ramp':
-            return `Take the exit ${distanceText}`;
-        case 'notification':
-            return streetName ? `Continue on ${streetName}` : "Continue";
-        default:
-            return streetName ? 
-                `Follow ${streetName} ${distanceText}` : 
-                `Continue ${distanceText}`;
-    }
-}
+            
+            // Google/Apple style instructions
+            switch(maneuverType) {
+                case 'depart':
+                    if (streetName) {
+                        return `Start on ${streetName}`;
+                    }
+                    return "Head toward destination";
+                    
+                case 'turn':
+                    if (modifier === 'left') {
+                        if (distanceText) {
+                            return `${distanceText}, turn left${streetName ? ' onto ' + streetName : ''}`;
+                        }
+                        return `Turn left${streetName ? ' onto ' + streetName : ''}`;
+                    } else if (modifier === 'right') {
+                        if (distanceText) {
+                            return `${distanceText}, turn right${streetName ? ' onto ' + streetName : ''}`;
+                        }
+                        return `Turn right${streetName ? ' onto ' + streetName : ''}`;
+                    } else if (modifier === 'sharp left') {
+                        return `${distanceText}, sharp left${streetName ? ' onto ' + streetName : ''}`;
+                    } else if (modifier === 'sharp right') {
+                        return `${distanceText}, sharp right${streetName ? ' onto ' + streetName : ''}`;
+                    } else if (modifier === 'slight left') {
+                        return `${distanceText}, keep left${streetName ? ' onto ' + streetName : ''}`;
+                    } else if (modifier === 'slight right') {
+                        return `${distanceText}, keep right${streetName ? ' onto ' + streetName : ''}`;
+                    }
+                    return `${distanceText}, turn${streetName ? ' onto ' + streetName : ''}`;
+                    
+                case 'continue':
+                    if (streetName) {
+                        return `${distanceText}, continue on ${streetName}`;
+                    }
+                    return `${distanceText}, continue straight`;
+                    
+                case 'arrive':
+                    if (index === allSteps.length - 1) {
+                        return "You have arrived at your destination";
+                    }
+                    return `Arrive at waypoint`;
+                    
+                case 'roundabout':
+                    const exitNum = step.maneuver.exit || 1;
+                    let exitText = '';
+                    if (exitNum === 1) exitText = '1st exit';
+                    else if (exitNum === 2) exitText = '2nd exit';
+                    else if (exitNum === 3) exitText = '3rd exit';
+                    else exitText = `${exitNum}th exit`;
+                    
+                    if (distanceText) {
+                        return `${distanceText}, take the ${exitText}${streetName ? ' onto ' + streetName : ''}`;
+                    }
+                    return `Take the ${exitText}${streetName ? ' onto ' + streetName : ''}`;
+                    
+                case 'merge':
+                    return `${distanceText}, merge${streetName ? ' onto ' + streetName : ''}`;
+                    
+                case 'fork':
+                    if (modifier === 'left') {
+                        return `${distanceText}, keep left at the fork${streetName ? ' onto ' + streetName : ''}`;
+                    } else if (modifier === 'right') {
+                        return `${distanceText}, keep right at the fork${streetName ? ' onto ' + streetName : ''}`;
+                    }
+                    return `${distanceText}, at the fork, continue${streetName ? ' onto ' + streetName : ''}`;
+                    
+                case 'off ramp':
+                    return `${distanceText}, take the exit${streetName ? ' onto ' + streetName : ''}`;
+                    
+                case 'on ramp':
+                    return `${distanceText}, take the ramp${streetName ? ' onto ' + streetName : ''}`;
+                    
+                case 'end of road':
+                    if (modifier === 'left') {
+                        return `${distanceText}, at end of road, turn left${streetName ? ' onto ' + streetName : ''}`;
+                    } else if (modifier === 'right') {
+                        return `${distanceText}, at end of road, turn right${streetName ? ' onto ' + streetName : ''}`;
+                    }
+                    return `${distanceText}, at end of road, continue${streetName ? ' onto ' + streetName : ''}`;
+                    
+                case 'new name':
+                    if (streetName) {
+                        return `${distanceText}, road becomes ${streetName}`;
+                    }
+                    return `${distanceText}, continue`;
+                    
+                case 'notification':
+                    // Handle specific notifications
+                    if (step.maneuver.notification_type === 'toll') {
+                        return `${distanceText}, toll road ahead`;
+                    }
+                    if (step.maneuver.notification_type === 'ferry') {
+                        return `${distanceText}, take ferry`;
+                    }
+                    return streetName ? `${distanceText}, follow ${streetName}` : `${distanceText}, continue`;
+                    
+                case 'exit roundabout':
+                    return `${distanceText}, exit the roundabout${streetName ? ' onto ' + streetName : ''}`;
+                    
+                default:
+                    if (streetName) {
+                        return `${distanceText}, follow ${streetName}`;
+                    }
+                    return `${distanceText}, continue`;
+            }
+        }
         
         function displaySearchResults(results) {
             const container = document.getElementById('results');
@@ -2379,7 +4198,7 @@ function generateRealNavigationInstruction(step, index, allSteps) {
             document.getElementById('results').classList.add('hidden');
             document.getElementById('filters').classList.add('hidden');
         }
-        
+
         // --- UTILITIES ---
         function formatTime(seconds) {
             const hours = Math.floor(seconds / 3600);
@@ -2405,19 +4224,25 @@ function generateRealNavigationInstruction(step, index, allSteps) {
             routeLayer.clearLayers(); 
             currentRoute = null;
             currentNavRoute = null;
-            isNavigating = false;
             
-            // Remove navigating class from body
-            document.body.classList.remove('navigating');
+            if (isNavigating) {
+                exitNavigation();
+                isNavigating = false;
+                
+                if (gpsWatchInterval) {
+                    clearInterval(gpsWatchInterval);
+                    gpsWatchInterval = null;
+                }
+            }
             
             if (gpsWatchInterval) {
                 clearInterval(gpsWatchInterval);
                 gpsWatchInterval = null;
             }
 
-    if (destinationMarker && map.hasLayer(destinationMarker)) {
-        map.removeLayer(destinationMarker);
-    }
+            if (destinationMarker && map.hasLayer(destinationMarker)) {
+                map.removeLayer(destinationMarker);
+            }
             
             // Reset sidebar to default
             document.getElementById('sidebar-content').innerHTML = `
@@ -2441,36 +4266,172 @@ function generateRealNavigationInstruction(step, index, allSteps) {
             }
         }
 
-function updateDestinationMarker(lat, lng, name = "Destination") {
-    // Remove existing destination marker if present
-    if (destinationMarker && map.hasLayer(destinationMarker)) {
-        map.removeLayer(destinationMarker);
-    }
-    
-    // Create new destination marker
-    destinationMarker = L.marker([lat, lng], {
-        icon: L.divIcon({
-            className: 'destination-marker',
-            html: '<div style="background: #ef4444; width: 16px; height: 16px; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 10px rgba(239,68,68,0.5); position: relative;"><div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 6px; height: 6px; background: white; border-radius: 50%;"></div></div>',
-            iconSize: [22, 22],
-            iconAnchor: [11, 11]
-        }),
-        zIndexOffset: 1000,
-        title: name
-    });
-    
-    // Add to map
-    destinationMarker.addTo(map);
-    
-    // Add popup with location name
-    if (name && name !== "Destination") {
-        destinationMarker.bindPopup(`
-            <div class="text-xs font-bold text-white" style="margin-right: 15px;">${name}</div>
-            <div class="text-[10px] text-neutral-600">Destination</div>
-        `);
-    }
-}
+        function updateDestinationMarker(lat, lng, name = "Destination") {
+            // Remove existing destination marker if present
+            if (destinationMarker && map.hasLayer(destinationMarker)) {
+                map.removeLayer(destinationMarker);
+            }
+            
+            // Create new destination marker
+            destinationMarker = L.marker([lat, lng], {
+                icon: L.divIcon({
+                    className: 'destination-marker',
+                    html: '<div style="background: #ef4444; width: 16px; height: 16px; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 10px rgba(239,68,68,0.5); position: relative;"><div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 6px; height: 6px; background: white; border-radius: 50%;"></div></div>',
+                    iconSize: [22, 22],
+                    iconAnchor: [11, 11]
+                }),
+                zIndexOffset: 1000,
+                title: name
+            });
+            
+            // Add to map
+            destinationMarker.addTo(map);
+            
+            // Add popup with location name
+            if (name && name !== "Destination") {
+                destinationMarker.bindPopup(`
+                    <div class="text-xs font-bold text-white" style="margin-right: 15px;">${name}</div>
+                    <div class="text-[10px] text-neutral-600">Destination</div>
+                `);
+            }
+        }
+
+        async function checkRealFerryRoute(start, end) {
+            try {
+                const [startLng, startLat] = [start[1], start[0]];
+                const [endLng, endLat] = [end[1], end[0]];
+                
+                // Use Overpass API to find ferry routes in the area
+                const bbox = [
+                    Math.min(startLat, endLat) - 1,
+                    Math.min(startLng, endLng) - 1,
+                    Math.max(startLat, endLat) + 1,
+                    Math.max(startLng, endLng) + 1
+                ].join(',');
+                
+                const overpassQuery = `
+                    [out:json][timeout:25];
+                    (
+                        // Find ferry routes (route=ferry relations)
+                        relation["route"="ferry"](${bbox});
+                        // Find ferry ways
+                        way["route"="ferry"](${bbox});
+                        // Find ferry terminals (amenity=ferry_terminal)
+                        node["amenity"="ferry_terminal"](${bbox});
+                    );
+                    out body;
+                    >;
+                    out skel qt;
+                `;
+                
+                const response = await fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(overpassQuery)}`);
+                const data = await response.json();
+                
+                if (data.elements && data.elements.length > 0) {
+                    // Process ferry data
+                    const ferryRoutes = data.elements.filter(el => 
+                        el.type === 'relation' && el.tags && el.tags.route === 'ferry'
+                    );
+                    
+                    const ferryTerminals = data.elements.filter(el => 
+                        el.type === 'node' && el.tags && el.tags.amenity === 'ferry_terminal'
+                    );
+                    
+                    if (ferryRoutes.length > 0 || ferryTerminals.length > 0) {
+                        // Calculate if points are near ferry terminals
+                        const startNearTerminal = isNearFerryTerminal(start, ferryTerminals);
+                        const endNearTerminal = isNearFerryTerminal(end, ferryTerminals);
+                        
+                        if (startNearTerminal && endNearTerminal) {
+                            // Estimate ferry time (average 30 knots ≈ 55 km/h)
+                            const distance = map.distance(start, end);
+                            const ferryTime = (distance / 55000) * 3600; // seconds
+                            
+                            return {
+                                hasFerry: true,
+                                duration: ferryTime + 1800, // +30 min for boarding
+                                distance: distance,
+                                description: "Ferry route available",
+                                terminals: {
+                                    start: startNearTerminal.name || "Ferry terminal",
+                                    end: endNearTerminal.name || "Ferry terminal"
+                                }
+                            };
+                        }
+                    }
+                }
+                
+                return { hasFerry: false };
+            } catch (error) {
+                console.error("Ferry route check failed:", error);
+                return { hasFerry: false };
+            }
+        }
+
+        function isNearFerryTerminal(point, terminals) {
+            const [lat, lng] = point;
+            
+            for (const terminal of terminals) {
+                const terminalLat = terminal.lat;
+                const terminalLng = terminal.lon;
+                const distance = map.distance([lat, lng], [terminalLat, terminalLng]);
+                
+                if (distance < 5000) { // Within 5km
+                    return {
+                        name: terminal.tags.name || "Ferry Terminal",
+                        lat: terminalLat,
+                        lng: terminalLng
+                    };
+                }
+            }
+            return null;
+        }
         
+        function exitNavigation() {
+            isNavigating = false;
+            document.body.classList.remove('navigating');
+            document.getElementById('standard-ui').style.display = 'flex';
+            document.getElementById('active-nav-hud').style.display = 'none';
+            
+            // Clear navigation intervals
+            if (window.navUpdateInterval) {
+                clearInterval(window.navUpdateInterval);
+                window.navUpdateInterval = null;
+            }
+            
+            // Clear map move listeners
+            map.off('movestart');
+            map.off('moveend');
+            
+            // Clear navigation camera
+            window.navigationCamera = null;
+            
+            // Clear route arrows
+            if (window.routeArrows) {
+                window.routeArrows.clearLayers();
+                window.routeArrows = null;
+            }
+            
+            // Clear user nav marker
+            if (window.userNavMarker) {
+                map.removeLayer(window.userNavMarker);
+                window.userNavMarker = null;
+            }
+            
+            // Reset route layer
+            routeLayer.clearLayers();
+            
+            // Reset navigation state
+            currentNavRoute = null;
+            currentStepIndex = 0;
+            
+            // Reset map cursor
+            map.getContainer().style.cursor = '';
+            
+            // Reset sidebar
+            closeSidebar();
+        }
+
         // --- EVENT LISTENERS ---
         document.addEventListener('DOMContentLoaded', () => {
             // Search input
@@ -2524,14 +4485,7 @@ function updateDestinationMarker(lat, lng, name = "Destination") {
                 map.zoomOut();
             });
             
-            // Exit navigation button
-            document.getElementById('exit-nav-btn').addEventListener('click', () => {
-                isNavigating = false;
-                document.getElementById('standard-ui').style.display = 'flex';
-                document.getElementById('active-nav-hud').style.display = 'none';
-
-                closeSidebar();
-            });
+            document.getElementById('exit-nav-btn').addEventListener('click', exitNavigation);
             
             // Close search results when clicking outside
             document.addEventListener('click', (e) => {
