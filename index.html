@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Strike Maps | Navigation Suite v4</title>
+    <title>Strike Maps</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js"></script>
@@ -562,6 +562,15 @@ max-height: 270px !important;
     #custom-start-search-results::-webkit-scrollbar-thumb {
         background: rgba(139, 92, 246, 0.5) !important;
     }
+
+@media (max-width: 775px) {
+#info-sidebar {
+width: 92% !important;
+}
+        body.navigating #info-sidebar {
+            display: none !important;
+        }
+}
 </style>
 </head>
 <body class="bg-black">
@@ -717,7 +726,7 @@ max-height: 270px !important;
 </div>
         <div class="opacity-40 text-[10px] font-black uppercase tracking-widest text-white flex items-center gap-2">
             <svg width="12" height="12" viewBox="0 0 76 65" fill="white"><path d="M37.5274 0L75.0548 65H0L37.5274 0Z"></path></svg>
-            Strike Maps Enterprise v4
+            Strike Maps [V5]
         </div>
     </div>
 
