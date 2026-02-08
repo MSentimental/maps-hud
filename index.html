@@ -1261,11 +1261,6 @@ function searchCustomStartLocation(query) {
                 updateStartPointDisplay();
             }
             
-            // Smooth pan to user if not navigating
-            if (!isNavigating) {
-                map.panTo(userPos, {animate: true, duration: 0.5});
-            }
-            
             // Update HUD - only if not navigating
             if (!isNavigating) {
                 document.getElementById('hud-precision').innerText = `${pos.coords.accuracy.toFixed(0)}m`;
