@@ -751,7 +751,22 @@ width: 92% !important;
         let searchResults = [];
         let activeFilter = 'all';
         let isNavigating = false;
-        let recentSearches = JSON.parse(localStorage.getItem('strikeRecentSearches')) || [];
+let recentSearches = [];
+
+try {
+    const storedSearches = localStorage.getItem('strikeRecentSearches');
+    if (storedSearches) {
+        recentSearches = JSON.parse(storedSearches);
+        if (!Array.isArray(recentSearches)) {
+            recentSearches = [];
+            localStorage.removeItem('strikeRecentSearches');
+        }
+    }
+} catch (error) {
+    console.error("Error loading recent searches:", error);
+    recentSearches = [];
+    localStorage.removeItem('strikeRecentSearches');
+}
         let watchId = null;
         let totalRouteDistance = 0;
         let remainingDistance = 0;
@@ -2116,12 +2131,16 @@ function searchCustomStartLocation(query) {
             const container = document.getElementById('results');
             const filters = document.getElementById('filters');
             
-            if (recentSearches.length === 0) {
-                container.classList.add('hidden');
-                filters.classList.add('hidden');
-                return;
-            }
-            
+                if (recentSearches.length === 0) {
+        // Still show filters even with no recent searches
+        filters.classList.add('show');
+        filters.classList.remove('hidden');
+        
+        container.innerHTML = '<div class="text-xs text-neutral-500 p-4 text-center">No recent searches</div>';
+        container.classList.add('show');
+        container.classList.remove('hidden');
+        return;
+    }
             filters.classList.remove('hidden');
             
             let html = `
