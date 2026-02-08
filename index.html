@@ -275,7 +275,7 @@ body.navigating .nav-hud-distance { display: block; }
 /* Custom start point UI */
 #custom-start-panel {
     position: absolute;
-    top: 180px; /* Moved down below the Signal State panel */
+    top: 180px;
     left: 24px;
     z-index: 1001;
     width: 340px;
@@ -474,17 +474,53 @@ body.navigating .nav-hud-distance { display: block; }
     z-index: 1002; /* Even higher */
 }
 
-/* Remove the .dynamic-height class styles - we don't need them */
+    .leaflet-popup-content {
+        font-family: 'Manrope', sans-serif !important;
+        margin: 12px !important;
+        min-width: fit-content !important;
+    }
+    
+    .leaflet-popup-content-wrapper {
+        background: var(--glass-surface) !important;
+        backdrop-filter: blur(30px) !important;
+        border: 1px solid var(--glass-border) !important;
+        border-radius: 12px !important;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.9) !important;
+    }
+    
+    .leaflet-popup-tip {
+        background: var(--glass-surface) !important;
+        border: 1px solid var(--glass-border) !important;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.9) !important;
+    }
+    
+    .leaflet-popup-close-button {
+        color: #9ca3af !important;
+        font-size: 18px !important;
+        padding: 4px 8px !important;
+        transition: all 0.2s !important;
+    }
+
+.leaflet-container a.leaflet-popup-close-button {
+    right: 5px !important;
+}
+    
+    .leaflet-popup-close-button:hover {
+        color: white !important;
+        background: transparent !important;
+    }
+
+.leaflet-popup {
+    min-width: 180px;
+}
     </style>
 
 <style>
-    /* Add this new style to control the starting point panel positioning */
     .starting-panel-container {
         position: relative;
         width: 100%;
     }
 
-    /* FIXED: Custom start point UI - properly positioned below Signal State */
     #custom-start-panel {
         position: absolute;
         top: 160px; /* Fixed position below signal state */
@@ -495,7 +531,32 @@ body.navigating .nav-hud-distance { display: block; }
         margin-top: 8px; /* Small gap from signal state */
     }
 
-    /* Ensure expanded panel is positioned correctly */
+    body.navigating #custom-start-panel {
+        display: none !important;
+    }
+
+    .destination-marker {
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        background: #ef4444;
+        border: 3px solid white;
+        box-shadow: 0 0 15px rgba(239, 68, 68, 0.7);
+        position: relative;
+    }
+    
+    .destination-marker::after {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 8px;
+        height: 8px;
+        background: white;
+        border-radius: 50%;
+    }
+
     #custom-start-expanded {
         display: none;
         position: absolute; /* Changed from fixed to absolute */
@@ -602,7 +663,7 @@ width: 92% !important;
         </div>
         <div class="strike-glass px-4 py-3 flex items-center justify-between ui-animate">
             <div class="flex flex-col">
-                <span class="text-[9px] font-bold text-neutral-500 uppercase tracking-tight">Signal State</span>
+                <span class="text-[9px] font-bold text-neutral-500 uppercase tracking-tight">Your Location</span>
                 <span id="status-text" class="text-[11px] font-bold text-white">Standby</span>
             </div>
             <button id="locate-btn" class="h-8 px-4 bg-white text-black rounded-lg text-[11px] font-extrabold flex items-center gap-2 hover:bg-neutral-100 transition-all">
@@ -778,7 +839,8 @@ try {
         let customStartMode = 'current'; // 'current', 'map', 'search'
         let customStartPos = null;
         let customStartMarker = null;
-        
+        let destinationMarker = null;
+         
         // Map initialization function
         function initMap() {
             map = L.map('map', { 
@@ -813,6 +875,16 @@ try {
                     iconAnchor: [11, 11]
                 })
             });
+
+    destinationMarker = L.marker([0,0], {
+        icon: L.divIcon({
+            className: 'destination-marker',
+            html: '<div style="background: #ef4444; width: 16px; height: 16px; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 10px rgba(239,68,68,0.5); position: relative;"><div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 6px; height: 6px; background: white; border-radius: 50%;"></div></div>',
+            iconSize: [22, 22],
+            iconAnchor: [11, 11]
+        }),
+        zIndexOffset: 1000
+    });
         }
         
         // Setup map event listeners
@@ -1196,7 +1268,7 @@ function searchCustomStartLocation(query) {
                             map.setView(userPos, 14);
                             
                             document.getElementById('hud-precision').innerText = `${pos.coords.accuracy.toFixed(0)}m`;
-                            document.getElementById('status-text').innerText = "Signal Locked";
+                            document.getElementById('status-text').innerText = "Located";
                             document.getElementById('hud-coords').innerText = `${userPos[0].toFixed(4)}, ${userPos[1].toFixed(4)}`;
                             
                             // Update start point display
@@ -1306,6 +1378,7 @@ function searchCustomStartLocation(query) {
             sidebar.classList.add('active');
             routeLayer.clearLayers();
             document.getElementById('start-nav-btn').classList.add('hidden');
+    updateDestinationMarker(lat, lng);
             
             document.getElementById('side-title').innerText = "Processing...";
             
@@ -1315,6 +1388,7 @@ function searchCustomStartLocation(query) {
                 
                 if (data.features && data.features.length > 0) {
                     const p = data.features[0].properties || {};
+            const locationName = p.name || p.street || "Selected Location";
                     document.getElementById('side-title').innerText = 
                         p.name || p.street || "Selected Location";
                     document.getElementById('sidebar-content').innerHTML = `
@@ -1329,6 +1403,8 @@ function searchCustomStartLocation(query) {
                             </div>
                         </div>
                     `;
+
+            updateDestinationMarker(lat, lng, locationName);
                 } else {
                     document.getElementById('side-title').innerText = "Location";
                     document.getElementById('sidebar-content').innerHTML = `
@@ -2338,6 +2414,10 @@ function generateRealNavigationInstruction(step, index, allSteps) {
                 clearInterval(gpsWatchInterval);
                 gpsWatchInterval = null;
             }
+
+    if (destinationMarker && map.hasLayer(destinationMarker)) {
+        map.removeLayer(destinationMarker);
+    }
             
             // Reset sidebar to default
             document.getElementById('sidebar-content').innerHTML = `
@@ -2360,6 +2440,36 @@ function generateRealNavigationInstruction(step, index, allSteps) {
                 userMarker.setLatLng(userPos);
             }
         }
+
+function updateDestinationMarker(lat, lng, name = "Destination") {
+    // Remove existing destination marker if present
+    if (destinationMarker && map.hasLayer(destinationMarker)) {
+        map.removeLayer(destinationMarker);
+    }
+    
+    // Create new destination marker
+    destinationMarker = L.marker([lat, lng], {
+        icon: L.divIcon({
+            className: 'destination-marker',
+            html: '<div style="background: #ef4444; width: 16px; height: 16px; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 10px rgba(239,68,68,0.5); position: relative;"><div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 6px; height: 6px; background: white; border-radius: 50%;"></div></div>',
+            iconSize: [22, 22],
+            iconAnchor: [11, 11]
+        }),
+        zIndexOffset: 1000,
+        title: name
+    });
+    
+    // Add to map
+    destinationMarker.addTo(map);
+    
+    // Add popup with location name
+    if (name && name !== "Destination") {
+        destinationMarker.bindPopup(`
+            <div class="text-xs font-bold text-white" style="margin-right: 15px;">${name}</div>
+            <div class="text-[10px] text-neutral-600">Destination</div>
+        `);
+    }
+}
         
         // --- EVENT LISTENERS ---
         document.addEventListener('DOMContentLoaded', () => {
@@ -2419,6 +2529,7 @@ function generateRealNavigationInstruction(step, index, allSteps) {
                 isNavigating = false;
                 document.getElementById('standard-ui').style.display = 'flex';
                 document.getElementById('active-nav-hud').style.display = 'none';
+
                 closeSidebar();
             });
             
