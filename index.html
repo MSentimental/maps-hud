@@ -36,7 +36,6 @@
         .route-card { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); padding: 12px; border-radius: 12px; transition: all 0.2s; cursor: pointer; }
         .route-card.active { border-color: #ffffff; background: rgba(255, 255, 255, 0.05); }
 
-        /* ACTIVE NAV HUD */
         #active-nav-hud { display: none; }
         
         #loader { position: fixed; inset: 0; z-index: 9999; background: #000; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: opacity 0.5s; }
@@ -63,18 +62,15 @@
             100% { transform: scale(1); opacity: 1; }
         }
         
-        /* Search results and filters */
         #results { max-height: 250px; overflow-y: auto; }
         #results::-webkit-scrollbar { width: 4px; }
         #results::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); border-radius: 2px; }
         #results::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 2px; }
         
-        /* Directions list scrollbar */
         #sidebar-content::-webkit-scrollbar { width: 4px; }
         #sidebar-content::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); border-radius: 2px; }
         #sidebar-content::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 2px; }
         
-        /* Directions list specific */
         #directions-list { max-height: 500px; overflow-y: auto; }
         #directions-list::-webkit-scrollbar { width: 4px; }
         #directions-list::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); border-radius: 2px; }
@@ -87,17 +83,13 @@
         .filter-btn { padding: 6px 10px; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; font-size: 10px; font-weight: 600; background: rgba(255,255,255,0.03); color: rgba(255,255,255,0.7); transition: all 0.2s; }
         .filter-btn.active { background: rgba(255,255,255,0.1); color: white; border-color: rgba(255,255,255,0.3); }
         
-        /* Navigation instructions */
         .nav-instruction-text { font-size: 13px; line-height: 1.4; }
         
-        /* Exit navigation button */
         #exit-nav-btn { background: rgba(239, 68, 68, 0.25); border: 1px solid rgba(239, 68, 68, 0.5); color: #ff6b6b; }
         #exit-nav-btn:hover { background: #ef4444; color: white; border-color: #ef4444; }
         
-        /* Path styling */
         .aviation-path { stroke-dasharray: 10, 10; }
         
-        /* Type badges */
         .type-badge { 
             font-size: 8px; 
             font-weight: 700; 
@@ -112,12 +104,10 @@
         .type-landmark { background: rgba(245, 158, 11, 0.2); color: #fcd34d; }
         .type-default { background: rgba(255, 255, 255, 0.1); color: rgba(255, 255, 255, 0.7); }
         
-        /* Directions list */
         .direction-item { padding: 12px; border-bottom: 1px solid rgba(255,255,255,0.05); transition: all 0.3s; }
         .direction-item.active { background: rgba(59, 130, 246, 0.15); border-left: 3px solid #3b82f6; }
         .direction-item.completed { opacity: 0.5; }
         
-        /* Traffic indicators */
         .traffic-indicator { 
             display: inline-block; 
             width: 6px; 
@@ -129,16 +119,13 @@
         .traffic-medium { background: #f59e0b; }
         .traffic-low { background: #10b981; }
         
-        /* Recents list */
         .recent-item { padding: 8px 12px; border-bottom: 1px solid rgba(255,255,255,0.05); cursor: pointer; }
         .recent-item:hover { background: rgba(255,255,255,0.05); }
         .recent-time { font-size: 9px; color: #6b7280; }
         
-        /* Progress bar */
         .progress-bar { height: 3px; background: rgba(255,255,255,0.1); border-radius: 2px; overflow: hidden; margin-top: 8px; }
         .progress-fill { height: 100%; background: linear-gradient(90deg, #10b981, #3b82f6); transition: width 0.3s; }
-        
-        /* Step numbers */
+
         .step-number { 
             width: 24px; 
             height: 24px; 
@@ -156,13 +143,11 @@
         .step-instruction { font-size: 12px; font-weight: 600; color: white; }
         .step-details { font-size: 10px; color: #9ca3af; margin-top: 2px; }
         
-        /* HUD elements */
         .nav-hud-pos { display: block; }
         .nav-hud-eta { display: none; }
         .nav-hud-acc { display: block; }
         .nav-hud-distance { display: none; }
         
-        /* When navigating */
         body.navigating .nav-hud-pos { display: none; }
         body.navigating .nav-hud-eta { display: block; }
         body.navigating .nav-hud-acc { display: none; }
@@ -187,7 +172,6 @@ body.navigating .nav-hud-distance { display: block; }
 .nav-hud-acc::before { content: "Acc:  "; }
 .nav-hud-distance::before { content: "Left:  "; } 
 
-/* Custom start point UI */
 #custom-start-panel {
     position: absolute;
     top: 80px;
@@ -272,7 +256,6 @@ body.navigating .nav-hud-distance { display: block; }
     border: 1px solid rgba(255,255,255,0.05);
 }
 
-/* Custom start point UI */
 #custom-start-panel {
     position: absolute;
     top: 180px;
@@ -357,14 +340,13 @@ body.navigating .nav-hud-distance { display: block; }
     border: 1px solid rgba(255,255,255,0.05);
 }
 
-/* Custom start point UI - FIXED HEIGHT AND SCROLLING */
 #custom-start-panel {
     position: absolute;
-    top: 180px; /* Moved down below the Signal State panel */
+    top: 180px;
     left: 24px;
-    z-index: 999; /* LOWER than search panel (1000) */
+    z-index: 999;
     width: 340px;
-    pointer-events: auto; /* Ensure it's clickable */
+    pointer-events: auto;
 }
 
 #custom-start-toggle {
@@ -396,28 +378,26 @@ body.navigating .nav-hud-distance { display: block; }
     border: 1px solid var(--glass-border);
     border-radius: 12px;
     box-shadow: 0 24px 60px rgba(0,0,0,0.9);
-    overflow-y: auto; /* Always scrollable */
+    overflow-y: auto;
 }
 
-/* DYNAMIC HEIGHT CALCULATION - Will be set by JavaScript */
 #custom-start-expanded.dynamic-height {
-    position: fixed; /* Fixed positioning for viewport calculation */
-    max-height: none; /* Remove fixed max-height */
+    position: fixed;
+    max-height: none;
 }
 
-/* CUSTOM SCROLLBAR for starting panel */
 #custom-start-expanded::-webkit-scrollbar {
-    width: 6px !important; /* Different width than other scrollbars */
+    width: 6px !important;
 }
 
 #custom-start-expanded::-webkit-scrollbar-track {
     background: rgba(255,255,255,0.05) !important;
-    border-radius: 3px !important; /* Different radius */
+    border-radius: 3px !important;
     margin: 4px 0 !important;
 }
 
 #custom-start-expanded::-webkit-scrollbar-thumb {
-    background: rgba(59, 130, 246, 0.5) !important; /* Blue color */
+    background: rgba(59, 130, 246, 0.5) !important;
     border-radius: 3px !important;
     border: 1px solid rgba(255,255,255,0.1) !important;
 }
@@ -426,7 +406,6 @@ body.navigating .nav-hud-distance { display: block; }
     background: rgba(59, 130, 246, 0.7) !important;
 }
 
-/* Fix search results overflow */
 #custom-start-search-results {
     max-height: 200px;
     overflow-y: auto;
@@ -434,7 +413,6 @@ body.navigating .nav-hud-distance { display: block; }
     display: none;
 }
 
-/* Different scrollbar for search results inside starting panel */
 #custom-start-search-results::-webkit-scrollbar {
     width: 4px !important;
 }
@@ -444,23 +422,21 @@ body.navigating .nav-hud-distance { display: block; }
 }
 
 #custom-start-search-results::-webkit-scrollbar-thumb {
-    background: rgba(139, 92, 246, 0.5) !important; /* Purple color */
+    background: rgba(139, 92, 246, 0.5) !important;
 }
 
-/* Remove the duplicate styles and keep only this: */
 #custom-start-panel {
     position: absolute;
-    top: 180px; /* Below the Signal State panel (80px + height of panels + gap) */
+    top: 180px;
     left: 24px;
-    z-index: 1001; /* Higher than standard-ui (1000) */
+    z-index: 1001;
     width: 340px;
     pointer-events: auto;
 }
 
-/* Make the expanded panel FIXED to viewport */
 #custom-start-expanded {
     display: none;
-    position: fixed; /* Changed from absolute to fixed */
+    position: fixed;
     margin-top: 8px;
     padding: 16px;
     background: var(--glass-surface);
@@ -469,9 +445,9 @@ body.navigating .nav-hud-distance { display: block; }
     border-radius: 12px;
     box-shadow: 0 24px 60px rgba(0,0,0,0.9);
     overflow-y: auto;
-    max-height: calc(100vh - 200px); /* Dynamic based on viewport */
-    width: 340px; /* Same width as parent */
-    z-index: 1002; /* Even higher */
+    max-height: calc(100vh - 200px);
+    width: 340px;
+    z-index: 1002;
 }
 
     .leaflet-popup-content {
@@ -525,12 +501,12 @@ body.navigating .nav-hud-distance { display: block; }
 
     #custom-start-panel {
         position: absolute;
-        top: 160px; /* Fixed position below signal state */
+        top: 160px;
         left: 24px;
-        z-index: 999; /* Lower than search panel (1000) */
+        z-index: 999;
         width: 340px;
         pointer-events: auto;
-        margin-top: 8px; /* Small gap from signal state */
+        margin-top: 8px;
     }
 
     body.navigating #custom-start-panel {
@@ -561,7 +537,7 @@ body.navigating .nav-hud-distance { display: block; }
 
     #custom-start-expanded {
         display: none;
-        position: absolute; /* Changed from fixed to absolute */
+        position: absolute;
         margin-top: 8px;
         padding: 16px;
         background: var(--glass-surface);
@@ -570,18 +546,16 @@ body.navigating .nav-hud-distance { display: block; }
         border-radius: 12px;
         box-shadow: 0 24px 60px rgba(0,0,0,0.9);
         overflow-y: auto;
-        width: 100%; /* Full width of parent */
+        width: 100%;
         box-sizing: border-box;
         z-index: 1002;
 max-height: 270px !important;
     }
 
-    /* Set a reasonable maximum height that won't exceed viewport */
     #custom-start-expanded {
-        max-height: 400px; /* Fixed max height */
+        max-height: 400px;
     }
 
-    /* Custom scrollbar for starting panel */
     #custom-start-expanded::-webkit-scrollbar {
         width: 6px !important;
     }
@@ -602,9 +576,8 @@ max-height: 270px !important;
         background: rgba(59, 130, 246, 0.7) !important;
     }
 
-    /* Fix search results inside starting panel to have their own scroll */
     #custom-start-search-results {
-        max-height: 150px; /* Smaller fixed height */
+        max-height: 150px;
         overflow-y: auto;
         margin-top: 8px;
         display: none;
@@ -613,7 +586,6 @@ max-height: 270px !important;
         background: rgba(0,0,0,0.3);
     }
 
-    /* Different scrollbar for search results inside starting panel */
     #custom-start-search-results::-webkit-scrollbar {
         width: 4px !important;
     }
@@ -645,7 +617,6 @@ width: 92% !important;
     z-index: 3000 !important;
 }
 
-/* Click highlight animation */
 .click-highlight {
     animation: highlightPulse 1.5s ease-out;
 }
@@ -665,7 +636,6 @@ width: 92% !important;
     }
 }
 
-/* Map click mode */
 .map-click-mode-active {
     cursor: crosshair !important;
 }
@@ -674,7 +644,6 @@ width: 92% !important;
     cursor: crosshair !important;
 }
 
-/* Navigation arrows */
 .nav-arrow {
     opacity: 0.7;
     transition: opacity 0.3s;
@@ -684,7 +653,6 @@ width: 92% !important;
     opacity: 1;
 }
 
-/* Navigation markers */
 .nav-start-marker {
     animation: pulseStart 2s infinite;
 }
@@ -705,14 +673,11 @@ width: 92% !important;
     100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
 }
 
-/* Navigation camera smoothing */
 .leaflet-fade-anim .leaflet-tile,
 .leaflet-zoom-anim .leaflet-zoom-animated {
     will-change: transform, opacity;
 }
 
-
-/* Map mode button states */
 .start-mode-btn.map-active {
     background: rgba(59, 130, 246, 0.3) !important;
     border-color: #3b82f6 !important;
@@ -726,7 +691,6 @@ width: 92% !important;
     100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
 }
 
-/* Map in click mode */
 .map-click-mode-active {
     cursor: crosshair !important;
 }
@@ -735,13 +699,11 @@ width: 92% !important;
     cursor: crosshair !important;
 }
 
-/* Click highlight */
 .click-highlight {
     pointer-events: none;
     z-index: 1000;
 }
 
-/* Navigation user marker */
 .nav-user-marker {
     animation: navUserPulse 2s infinite;
 }
@@ -752,7 +714,6 @@ width: 92% !important;
     100% { transform: scale(1); }
 }
 
-/* Navigation arrows */
 .nav-arrow-icon {
     filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4));
     opacity: 0.9;
@@ -886,7 +847,6 @@ width: 92% !important;
             <button onclick="closeSidebar()" class="text-neutral-500 hover:text-white"><iconify-icon icon="lucide:x" class="text-xl"></iconify-icon></button>
         </div>
         <div id="sidebar-content" class="p-6 flex-1 overflow-y-auto">
-            <!-- Content will be dynamically populated -->
         </div>
         <div class="p-6 bg-white/[0.02] border-t border-white/5 flex gap-2">
             <button id="start-nav-btn" class="hidden flex-1 h-12 bg-white text-black rounded-xl text-xs font-black flex items-center justify-center gap-3">
@@ -1029,13 +989,11 @@ width: 92% !important;
 
 async function getRealTimeTraffic(start, end) {
     try {
-        // Use OpenRouteService or similar for real traffic
         const response = await fetch(
             `https://api.openrouteservice.org/v2/directions/driving-car?api_key=YOUR_API_KEY&start=${start[1]},${start[0]}&end=${end[1]},${end[0]}`
         );
         const data = await response.json();
         
-        // Extract traffic info if available
         if (data.features && data.features[0].properties.segments) {
             const segments = data.features[0].properties.segments;
             let totalCongestion = 0;
@@ -1044,15 +1002,13 @@ async function getRealTimeTraffic(start, end) {
                 if (segment.steps) {
                     segment.steps.forEach(step => {
                         if (step.way_points && step.way_points.length > 0) {
-                            // Analyze congestion
                             totalCongestion += step.duration || 0;
                         }
                     });
                 }
             });
             
-            // Determine traffic level based on average speed
-            const avgSpeed = (route.distance / route.duration) * 3.6; // Convert to km/h
+            const avgSpeed = (route.distance / route.duration) * 3.6;
             if (avgSpeed < 20) return 'high';
             if (avgSpeed < 40) return 'medium';
             return 'low';
@@ -1061,7 +1017,6 @@ async function getRealTimeTraffic(start, end) {
         console.log("Real-time traffic unavailable, using simulated");
     }
     
-    // Fallback to simulated traffic
     const now = new Date();
     const hour = now.getHours();
     const isRushHour = (hour >= 7 && hour <= 9) || (hour >= 16 && hour <= 18);
@@ -1230,10 +1185,8 @@ async function getRealTimeTraffic(start, end) {
     }
 
 async function getLocationImages(lat, lng, name, addressDetails = {}) {
-    // First, analyze if this is a generic street or actual place
     const isGenericStreet = isGenericLocationName(name, addressDetails);
     
-    // If it's a generic street, skip Wikipedia (unless it's famous)
     if (isGenericStreet && !isFamousStreet(name, addressDetails.city)) {
         return {
             image: null,
@@ -1243,7 +1196,6 @@ async function getLocationImages(lat, lng, name, addressDetails = {}) {
         };
     }
     
-    // Try Wikipedia with better filtering
     try {
         const wikiResponse = await fetch(
             `https://en.wikipedia.org/w/api.php?action=query&format=json&prop=pageimages|extracts|coordinates&titles=${encodeURIComponent(name)}&exintro=1&explaintext=1&pithumbsize=400&colimit=1&origin=*`
@@ -1254,7 +1206,6 @@ async function getLocationImages(lat, lng, name, addressDetails = {}) {
         if (pages) {
             const page = Object.values(pages)[0];
             
-            // Check if this is actually a notable place
             if (isNotableWikipediaPage(page)) {
                 if (page.thumbnail?.source) {
                     return {
@@ -1271,9 +1222,7 @@ async function getLocationImages(lat, lng, name, addressDetails = {}) {
         console.error("Wikipedia error:", error);
     }
     
-    // Try Wikimedia Commons with geographic relevance
     try {
-        // Search for images near this location with location-specific terms
         const searchTerms = generateLocationSearchTerms(name, addressDetails);
         
         for (const term of searchTerms) {
@@ -1284,7 +1233,6 @@ async function getLocationImages(lat, lng, name, addressDetails = {}) {
             
             const pages = commonsData.query?.pages;
             if (pages) {
-                // Find the most relevant image
                 const relevantImage = findMostRelevantImage(pages, name, addressDetails);
                 if (relevantImage) {
                     return {
@@ -1300,7 +1248,6 @@ async function getLocationImages(lat, lng, name, addressDetails = {}) {
         console.error("Wikimedia Commons error:", error);
     }
     
-    // Try OpenStreetMap Nomination for notable features
     try {
         const notableFeature = await getNotableFeatureFromOSM(lat, lng);
         if (notableFeature && notableFeature.wikipedia_image) {
@@ -1315,7 +1262,6 @@ async function getLocationImages(lat, lng, name, addressDetails = {}) {
         console.error("OSM feature error:", error);
     }
     
-    // No relevant image available
     return {
         image: null,
         description: '',
@@ -1324,31 +1270,26 @@ async function getLocationImages(lat, lng, name, addressDetails = {}) {
     };
 }
 
-// Helper functions for intelligent filtering
-
 function isGenericLocationName(name, addressDetails) {
     const genericTerms = [
-        'street', 'st', 'road', 'rd', 'avenue', 'ave', 'boulevard', 'blvd', 
-        'drive', 'dr', 'lane', 'ln', 'court', 'ct', 'place', 'pl', 'way',
+        'street', 'avenue', 'boulevard', 'blvd', 
+        'drive','court', 'ct', 'place', 'pl', 'way',
         'highway', 'hwy', 'freeway', 'fwy', 'expressway', 'expy', 'parkway', 'pkwy',
         'route', 'rt', 'circle', 'cir', 'terrace', 'ter', 'trail', 'trl'
     ];
     
     const nameLower = name.toLowerCase();
     
-    // Check if name ends with generic street terms
     for (const term of genericTerms) {
         if (nameLower.includes(` ${term}`) || nameLower.endsWith(` ${term}`)) {
             return true;
         }
     }
     
-    // Check if it's just a number (like "5th Street")
     if (/^\d+(st|nd|rd|th)\s/.test(nameLower) || /^\d+$/.test(name)) {
         return true;
     }
     
-    // Check if it's a common route number
     if (/^(I-|US-|SR-|CR-|Route\s\d+)/i.test(name)) {
         return true;
     }
@@ -1363,13 +1304,11 @@ function isFamousStreet(name, city) {
         'las vegas strip', 'times square', 'piccadilly circus', 'trafalgar square'
     ];
     
-    // Check globally famous streets
     const nameLower = name.toLowerCase();
     if (famousStreets.includes(nameLower)) {
         return true;
     }
     
-    // Check city-specific famous streets
     const cityFamousStreets = {
         'new york': ['wall street', 'broadway', 'fifth avenue', 'madison avenue', 'park avenue'],
         'los angeles': ['rodeo drive', 'sunset boulevard', 'hollywood boulevard'],
@@ -1388,23 +1327,19 @@ function isFamousStreet(name, city) {
 }
 
 function isNotableWikipediaPage(page) {
-    // Check if page has sufficient content to be notable
     if (!page.extract || page.extract.length < 50) {
         return false;
     }
     
-    // Check for redirects
     if (page.redirect) {
         return false;
     }
     
-    // Check if it's a disambiguation page
     if (page.title && (page.title.includes('(disambiguation)') || 
                        page.extract.includes('may refer to'))) {
         return false;
     }
     
-    // Check page length in characters
     if (page.length && page.length < 500) {
         return false;
     }
@@ -1415,18 +1350,15 @@ function isNotableWikipediaPage(page) {
 function generateLocationSearchTerms(name, addressDetails) {
     const terms = [];
     
-    // Add city-specific searches if we have city info
     if (addressDetails.city) {
         terms.push(`${name} ${addressDetails.city}`);
         terms.push(`${addressDetails.city} ${name}`);
     }
     
-    // Add landmark-specific searches
     terms.push(`${name} landmark`);
     terms.push(`${name} building`);
     terms.push(`${name} architecture`);
     
-    // Add the plain name (as last resort)
     terms.push(name);
     
     return terms;
@@ -1440,10 +1372,8 @@ function findMostRelevantImage(pages, name, addressDetails) {
         if (page.imageinfo && page.imageinfo[0]) {
             const imageInfo = page.imageinfo[0];
             
-            // Score the image relevance
             let score = 0;
             
-            // Check filename for relevance
             const filename = page.title.toLowerCase();
             const nameLower = name.toLowerCase();
             
@@ -1459,7 +1389,6 @@ function findMostRelevantImage(pages, name, addressDetails) {
                 score += 1;
             }
             
-            // Check metadata if available
             if (imageInfo.extmetadata) {
                 const metadata = imageInfo.extmetadata;
                 
@@ -1472,7 +1401,6 @@ function findMostRelevantImage(pages, name, addressDetails) {
                 }
                 
                 if (metadata.DateTimeOriginal) {
-                    // Prefer newer images
                     const year = new Date(metadata.DateTimeOriginal.value).getFullYear();
                     if (year > 2010) score += 1;
                 }
@@ -1486,7 +1414,6 @@ function findMostRelevantImage(pages, name, addressDetails) {
         }
     }
     
-    // Return the highest scoring image
     images.sort((a, b) => b.score - a.score);
     return images[0];
 }
@@ -1498,24 +1425,19 @@ async function getNotableFeatureFromOSM(lat, lng) {
         );
         const data = await response.json();
         
-        // Check if this is a notable feature
         if (data.namedetails) {
             const names = data.namedetails;
             
-            // Look for Wikipedia links in OSM data
             if (data.extratags) {
                 const extras = data.extratags;
                 
-                // Check for Wikipedia/Commons links
                 const wikipedia = extras.wikipedia || extras['wikipedia:en'] || extras['wikipedia'];
                 const wikidata = extras.wikidata;
                 const image = extras.image || extras['image:0'] || extras['image:1'];
                 
                 if (wikipedia) {
-                    // Extract page title from Wikipedia URL
                     const pageTitle = wikipedia.split(':').slice(1).join(':');
                     
-                    // Try to get image from Wikipedia page
                     const wikiImageResponse = await fetch(
                         `https://en.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(pageTitle)}&prop=pageimages&format=json&pithumbsize=400&origin=*`
                     );
@@ -1536,7 +1458,6 @@ async function getNotableFeatureFromOSM(lat, lng) {
                 }
             }
             
-            // Check if it's a notable building/landmark
             const notableTypes = [
                 'historic', 'tourism', 'amenity', 'building', 'leisure',
                 'man_made', 'natural', 'place_of_worship', 'shop'
@@ -2516,7 +2437,17 @@ async function getNotableFeatureFromOSM(lat, lng) {
             }
         );
     }
-    
+
+function stripAllHTML(input = '') {
+    if (typeof input !== 'string') return '';
+    const div = document.createElement('div');
+    div.innerHTML = input;
+    return (div.textContent || '')
+        .replace(/\u00A0/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
     async function triggerAnalysis(lat, lng) {
 if (destinationMarker && map.hasLayer(destinationMarker)) {
             map.removeLayer(destinationMarker);
@@ -2547,24 +2478,24 @@ if (destinationMarker && map.hasLayer(destinationMarker)) {
         postcode: p.postcode
     };
     
-    // Get image data with filtering
     const imageData = await getLocationImages(lat, lng, locationName, addressDetails);
     
-    // Only show image if it has high/medium relevance
     const shouldShowImage = imageData.relevance === 'high' || imageData.relevance === 'medium';
+
+const cleanDescription = stripAllHTML(imageData.description);
+const truncatedDescription = cleanDescription.substring(0, 200) + (cleanDescription.length > 200 ? '...' : '');
+
+const safeWikiUrl = imageData.wikipediaUrl ? encodeURI(imageData.wikipediaUrl) : null;
                         
             document.getElementById('side-title').innerText = locationName;
             
-            // Build the address string
             const addressParts = [p.street, p.city, p.country, p.postcode].filter(Boolean);
             const addressString = addressParts.length > 0 ? 
                 addressParts.join(', ') : 
                 `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
             
-            // Build the HTML with consistent UI
             let sidebarHTML = `
                 <div class="space-y-6">
-                    <!-- IMAGE SECTION -->
                     ${imageData.image ? `
                     <div class="relative h-48 rounded-xl overflow-hidden">
                         <img src="${imageData.image}" 
@@ -2582,7 +2513,6 @@ if (destinationMarker && map.hasLayer(destinationMarker)) {
                         </div>
                     </div>
                     ` : `
-                    <!-- Placeholder when no image -->
                     <div class="h-32 rounded-xl bg-gradient-to-br from-gray-900 to-black border border-white/10 flex items-center justify-center">
                         <div class="text-center">
                             <iconify-icon icon="lucide:map-pin" class="text-3xl text-white/30 mb-2"></iconify-icon>
@@ -2591,16 +2521,15 @@ if (destinationMarker && map.hasLayer(destinationMarker)) {
                     </div>
                     `}
                     
-                    <!-- DESCRIPTION (if available) -->
                     ${imageData.description ? `
                     <div class="space-y-2">
                         <div class="flex items-center gap-2">
                             <iconify-icon icon="lucide:info" class="text-neutral-500"></iconify-icon>
                             <span class="text-[9px] font-bold text-neutral-500 uppercase tracking-widest">About</span>
                         </div>
-                        <p class="text-xs text-neutral-300 leading-relaxed line-clamp-3">${imageData.description.substring(0, 200)}${imageData.description.length > 200 ? '...' : ''}</p>
-                        ${imageData.wikipediaUrl ? `
-                        <a href="${imageData.wikipediaUrl}" target="_blank" class="inline-flex items-center gap-1 text-xs text-sky-400 hover:text-sky-300 mt-1">
+                        <p class="text-xs text-neutral-300 leading-relaxed line-clamp-3">${truncatedDescription}</p>
+                        ${safeWikiUrl ? `
+                        <a href="${safeWikiUrl}" target="_blank" class="inline-flex items-center gap-1 text-xs text-sky-400 hover:text-sky-300 mt-1">
                             <iconify-icon icon="lucide:external-link" class="text-[10px]"></iconify-icon>
                             Read more on Wikipedia
                         </a>
@@ -2608,7 +2537,6 @@ if (destinationMarker && map.hasLayer(destinationMarker)) {
                     </div>
                     ` : ''}
                     
-                    <!-- ADDRESS SECTION -->
                     <div class="space-y-2">
                         <div class="flex items-center gap-2">
                             <iconify-icon icon="lucide:map-pin" class="text-neutral-500"></iconify-icon>
@@ -2622,7 +2550,6 @@ if (destinationMarker && map.hasLayer(destinationMarker)) {
                         </button>
                     </div>
                     
-                    <!-- ROUTES SECTION -->
                     <div id="logistics-module">
                         <div class="flex items-center gap-2 mb-4">
                             <iconify-icon icon="lucide:route" class="text-neutral-500"></iconify-icon>
@@ -2638,7 +2565,6 @@ if (destinationMarker && map.hasLayer(destinationMarker)) {
             updateDestinationMarker(lat, lng, locationName);
             
         } else {
-            // Fallback for no reverse geocoding results
             const imageData = await getLocationImages(lat, lng, "Location");
             
             document.getElementById('side-title').innerText = "Location";
@@ -2717,33 +2643,93 @@ if (destinationMarker && map.hasLayer(destinationMarker)) {
         `;
     }
     
-    // Calculate routes
     calculateRoutes(getCurrentStartPoint(), [lat, lng]);
 }
 
-// Update the copyToClipboard function to accept the event parameter
 function copyToClipboard(text, event) {
-    // Prevent default if event exists
-    if (event) event.preventDefault();
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
     
-    navigator.clipboard.writeText(text).then(() => {
-        // Show success feedback
-        const button = event ? event.currentTarget : document.activeElement;
-        const originalHTML = button.innerHTML;
+    let button;
+    if (event && event.currentTarget) {
+        button = event.currentTarget;
+    } else if (event && event.target) {
+        button = event.target.closest('button');
+    }
+    
+    if (!button && event) {
+        let element = event.target;
+        while (element && element !== document.body) {
+            if (element.tagName === 'BUTTON') {
+                button = element;
+                break;
+            }
+            element = element.parentElement;
+        }
+    }
+    
+    if (!button) {
+        const buttons = document.querySelectorAll('button');
+        for (let i = buttons.length - 1; i >= 0; i--) {
+            if (buttons[i].textContent.includes('Copy')) {
+                button = buttons[i];
+                break;
+            }
+        }
+    }
+    
+    let originalHTML = null;
+    let originalClasses = null;
+    
+    if (button) {
+        originalHTML = button.innerHTML;
+        originalClasses = Array.from(button.classList);
+        
         button.innerHTML = `
             <iconify-icon icon="lucide:check" class="text-[10px]"></iconify-icon>
             Copied!
         `;
-        button.classList.remove('text-emerald-400');
+        button.classList.remove('text-emerald-400', 'hover:text-emerald-300');
         button.classList.add('text-green-400');
+
+        button.disabled = true;
+    }
+    
+    navigator.clipboard.writeText(text).then(() => {
+        console.log('Copied to clipboard:', text);
         
-        setTimeout(() => {
-            button.innerHTML = originalHTML;
-            button.classList.remove('text-green-400');
-            button.classList.add('text-emerald-400');
-        }, 2000);
+        if (button) {
+            setTimeout(() => {
+                if (originalHTML) {
+                    button.innerHTML = originalHTML;
+                }
+                if (originalClasses) {
+                    button.classList.remove('text-green-400');
+                    originalClasses.forEach(cls => button.classList.add(cls));
+                }
+                button.disabled = false;
+            }, 2000);
+        }
     }).catch(err => {
         console.error('Failed to copy:', err);
+        
+        if (button) {
+            if (originalHTML) {
+                button.innerHTML = originalHTML;
+            }
+            if (originalClasses) {
+                button.classList.remove('text-green-400');
+                originalClasses.forEach(cls => button.classList.add(cls));
+            }
+            button.disabled = false;
+            
+            button.classList.add('text-red-400');
+            setTimeout(() => {
+                button.classList.remove('text-red-400');
+            }, 1000);
+        }
     });
 }
  
@@ -2950,7 +2936,6 @@ function copyToClipboard(text, event) {
 
 function getCommercialAirports() {
     return [
-        // USA - Major International
         { code: "ATL", name: "Hartsfield-Jackson Atlanta International", city: "Atlanta", country: "USA", coordinates: [33.6407, -84.4277], size: "large" },
         { code: "LAX", name: "Los Angeles International", city: "Los Angeles", country: "USA", coordinates: [33.9416, -118.4085], size: "large" },
         { code: "ORD", name: "O'Hare International", city: "Chicago", country: "USA", coordinates: [41.9742, -87.9073], size: "large" },
@@ -3030,7 +3015,6 @@ function getCommercialAirports() {
         { code: "RDU", name: "Raleigh-Durham International", city: "Raleigh", country: "USA", coordinates: [35.8776, -78.7875], size: "large" },
         { code: "ILM", name: "Wilmington International", city: "Wilmington", country: "USA", coordinates: [34.2706, -77.9026], size: "small" },
         
-        // CANADA
         { code: "YYZ", name: "Toronto Pearson International", city: "Toronto", country: "Canada", coordinates: [43.6777, -79.6248], size: "large" },
         { code: "YVR", name: "Vancouver International", city: "Vancouver", country: "Canada", coordinates: [49.1947, -123.1792], size: "large" },
         { code: "YUL", name: "Montréal-Trudeau International", city: "Montreal", country: "Canada", coordinates: [45.4706, -73.7408], size: "large" },
@@ -3044,7 +3028,6 @@ function getCommercialAirports() {
         { code: "YXE", name: "Saskatoon John G. Diefenbaker International", city: "Saskatoon", country: "Canada", coordinates: [52.1708, -106.6997], size: "medium" },
         { code: "YLW", name: "Kelowna International", city: "Kelowna", country: "Canada", coordinates: [49.9561, -119.3778], size: "medium" },
         
-        // MEXICO
         { code: "MEX", name: "Mexico City International", city: "Mexico City", country: "Mexico", coordinates: [19.4363, -99.0721], size: "large" },
         { code: "CUN", name: "Cancún International", city: "Cancún", country: "Mexico", coordinates: [21.0365, -86.8771], size: "large" },
         { code: "GDL", name: "Guadalajara International", city: "Guadalajara", country: "Mexico", coordinates: [20.5218, -103.3112], size: "large" },
@@ -3055,8 +3038,7 @@ function getCommercialAirports() {
         { code: "MZT", name: "Mazatlán International", city: "Mazatlán", country: "Mexico", coordinates: [23.1614, -106.2661], size: "medium" },
         { code: "HMO", name: "Hermosillo International", city: "Hermosillo", country: "Mexico", coordinates: [29.0959, -111.0478], size: "medium" },
         { code: "LAP", name: "La Paz International", city: "La Paz", country: "Mexico", coordinates: [24.0727, -110.3625], size: "medium" },
-        
-        // UNITED KINGDOM
+
         { code: "LHR", name: "London Heathrow", city: "London", country: "UK", coordinates: [51.4700, -0.4543], size: "large" },
         { code: "LGW", name: "London Gatwick", city: "London", country: "UK", coordinates: [51.1481, -0.1903], size: "large" },
         { code: "STN", name: "London Stansted", city: "London", country: "UK", coordinates: [51.8850, 0.2350], size: "large" },
@@ -3067,12 +3049,10 @@ function getCommercialAirports() {
         { code: "BHX", name: "Birmingham Airport", city: "Birmingham", country: "UK", coordinates: [52.4539, -1.7480], size: "large" },
         { code: "BRS", name: "Bristol Airport", city: "Bristol", country: "UK", coordinates: [51.3827, -2.7191], size: "medium" },
         
-        // IRELAND
         { code: "DUB", name: "Dublin Airport", city: "Dublin", country: "Ireland", coordinates: [53.4213, -6.2701], size: "large" },
         { code: "SNN", name: "Shannon Airport", city: "Shannon", country: "Ireland", coordinates: [52.7020, -8.9248], size: "medium" },
         { code: "ORK", name: "Cork Airport", city: "Cork", country: "Ireland", coordinates: [51.8413, -8.4911], size: "medium" },
-        
-        // FRANCE
+
         { code: "CDG", name: "Paris Charles de Gaulle", city: "Paris", country: "France", coordinates: [49.0097, 2.5479], size: "large" },
         { code: "ORY", name: "Paris Orly", city: "Paris", country: "France", coordinates: [48.7253, 2.3594], size: "large" },
         { code: "NCE", name: "Nice Côte d'Azur", city: "Nice", country: "France", coordinates: [43.6584, 7.2159], size: "large" },
@@ -3081,14 +3061,11 @@ function getCommercialAirports() {
         { code: "TLS", name: "Toulouse-Blagnac", city: "Toulouse", country: "France", coordinates: [43.6291, 1.3638], size: "large" },
         { code: "BOD", name: "Bordeaux-Mérignac", city: "Bordeaux", country: "France", coordinates: [44.8283, -0.7156], size: "large" },
         
-        // NETHERLANDS
         { code: "AMS", name: "Amsterdam Schiphol", city: "Amsterdam", country: "Netherlands", coordinates: [52.3086, 4.7639], size: "large" },
         
-        // BELGIUM
         { code: "BRU", name: "Brussels Airport", city: "Brussels", country: "Belgium", coordinates: [50.9014, 4.4844], size: "large" },
         { code: "CRL", name: "Brussels South Charleroi", city: "Charleroi", country: "Belgium", coordinates: [50.4592, 4.4538], size: "medium" },
         
-        // SPAIN
         { code: "MAD", name: "Adolfo Suárez Madrid–Barajas", city: "Madrid", country: "Spain", coordinates: [40.4983, -3.5676], size: "large" },
         { code: "BCN", name: "Josep Tarradellas Barcelona–El Prat", city: "Barcelona", country: "Spain", coordinates: [41.2974, 2.0833], size: "large" },
         { code: "PMI", name: "Palma de Mallorca", city: "Palma", country: "Spain", coordinates: [39.5517, 2.7388], size: "large" },
@@ -3097,7 +3074,6 @@ function getCommercialAirports() {
         { code: "SVQ", name: "Seville", city: "Seville", country: "Spain", coordinates: [37.4180, -5.8931], size: "medium" },
         { code: "BIO", name: "Bilbao", city: "Bilbao", country: "Spain", coordinates: [43.3011, -2.9106], size: "medium" },
         
-        // ITALY
         { code: "FCO", name: "Rome–Fiumicino", city: "Rome", country: "Italy", coordinates: [41.8045, 12.2508], size: "large" },
         { code: "MXP", name: "Milan–Malpensa", city: "Milan", country: "Italy", coordinates: [45.6306, 8.7281], size: "large" },
         { code: "LIN", name: "Milan–Linate", city: "Milan", country: "Italy", coordinates: [45.4451, 9.2767], size: "medium" },
@@ -3108,17 +3084,14 @@ function getCommercialAirports() {
         { code: "PMO", name: "Palermo Falcone Borsellino", city: "Palermo", country: "Italy", coordinates: [38.1810, 13.0993], size: "large" },
         { code: "BLQ", name: "Bologna Guglielmo Marconi", city: "Bologna", country: "Italy", coordinates: [44.5354, 11.2887], size: "medium" },
         
-        // SWITZERLAND
         { code: "ZRH", name: "Zurich Airport", city: "Zurich", country: "Switzerland", coordinates: [47.4647, 8.5492], size: "large" },
         { code: "GVA", name: "Geneva Airport", city: "Geneva", country: "Switzerland", coordinates: [46.2381, 6.1089], size: "large" },
         { code: "BSL", name: "EuroAirport Basel-Mulhouse-Freiburg", city: "Basel", country: "Switzerland", coordinates: [47.5896, 7.5299], size: "medium" },
         
-        // AUSTRIA
         { code: "VIE", name: "Vienna International", city: "Vienna", country: "Austria", coordinates: [48.1103, 16.5697], size: "large" },
         { code: "SZG", name: "Salzburg Airport", city: "Salzburg", country: "Austria", coordinates: [47.7933, 13.0043], size: "medium" },
         { code: "INN", name: "Innsbruck Airport", city: "Innsbruck", country: "Austria", coordinates: [47.2602, 11.3440], size: "medium" },
         
-        // SCANDINAVIA
         { code: "ARN", name: "Stockholm Arlanda", city: "Stockholm", country: "Sweden", coordinates: [59.6519, 17.9186], size: "large" },
         { code: "OSL", name: "Oslo Gardermoen", city: "Oslo", country: "Norway", coordinates: [60.1939, 11.1004], size: "large" },
         { code: "CPH", name: "Copenhagen Airport", city: "Copenhagen", country: "Denmark", coordinates: [55.6180, 12.6561], size: "large" },
@@ -3128,13 +3101,11 @@ function getCommercialAirports() {
         { code: "SVG", name: "Stavanger Airport", city: "Stavanger", country: "Norway", coordinates: [58.8768, 5.6379], size: "medium" },
         { code: "TMP", name: "Tampere-Pirkkala", city: "Tampere", country: "Finland", coordinates: [61.4141, 23.6044], size: "medium" },
         
-        // GREECE
         { code: "ATH", name: "Athens International", city: "Athens", country: "Greece", coordinates: [37.9364, 23.9445], size: "large" },
         { code: "SKG", name: "Thessaloniki Airport", city: "Thessaloniki", country: "Greece", coordinates: [40.5197, 22.9709], size: "large" },
         { code: "HER", name: "Heraklion International", city: "Heraklion", country: "Greece", coordinates: [35.3397, 25.1803], size: "large" },
         { code: "CFU", name: "Corfu International", city: "Corfu", country: "Greece", coordinates: [39.6019, 19.9117], size: "medium" },
         
-        // EASTERN EUROPE
         { code: "BEG", name: "Belgrade Nikola Tesla", city: "Belgrade", country: "Serbia", coordinates: [44.8194, 20.3069], size: "large" },
         { code: "ZAG", name: "Zagreb Airport", city: "Zagreb", country: "Croatia", coordinates: [45.7429, 16.0688], size: "medium" },
         { code: "LJU", name: "Ljubljana Jože Pučnik", city: "Ljubljana", country: "Slovenia", coordinates: [46.2237, 14.4576], size: "medium" },
@@ -3142,13 +3113,11 @@ function getCommercialAirports() {
         { code: "TIA", name: "Tirana International", city: "Tirana", country: "Albania", coordinates: [41.4147, 19.7206], size: "medium" },
         { code: "SOF", name: "Sofia Airport", city: "Sofia", country: "Bulgaria", coordinates: [42.6952, 23.4062], size: "large" },
         
-        // TURKEY
         { code: "IST", name: "Istanbul Airport", city: "Istanbul", country: "Turkey", coordinates: [41.2622, 28.7425], size: "large" },
         { code: "SAW", name: "Istanbul Sabiha Gökçen", city: "Istanbul", country: "Turkey", coordinates: [40.8986, 29.3092], size: "large" },
         { code: "AYT", name: "Antalya Airport", city: "Antalya", country: "Turkey", coordinates: [36.8987, 30.8005], size: "large" },
         { code: "ADB", name: "İzmir Adnan Menderes", city: "Izmir", country: "Turkey", coordinates: [38.2924, 27.1569], size: "large" },
         
-        // JAPAN
         { code: "HND", name: "Tokyo Haneda", city: "Tokyo", country: "Japan", coordinates: [35.5494, 139.7798], size: "large" },
         { code: "NRT", name: "Tokyo Narita", city: "Tokyo", country: "Japan", coordinates: [35.7647, 140.3864], size: "large" },
         { code: "KIX", name: "Kansai International", city: "Osaka", country: "Japan", coordinates: [34.4273, 135.2441], size: "large" },
@@ -3158,7 +3127,6 @@ function getCommercialAirports() {
         { code: "CTS", name: "New Chitose Airport", city: "Sapporo", country: "Japan", coordinates: [42.7752, 141.6923], size: "large" },
         { code: "OKA", name: "Naha Airport", city: "Naha", country: "Japan", coordinates: [26.1958, 127.6459], size: "large" },
         
-        // CHINA
         { code: "PEK", name: "Beijing Capital International", city: "Beijing", country: "China", coordinates: [40.0799, 116.6031], size: "large" },
         { code: "PKX", name: "Beijing Daxing International", city: "Beijing", country: "China", coordinates: [39.5098, 116.4105], size: "large" },
         { code: "PVG", name: "Shanghai Pudong International", city: "Shanghai", country: "China", coordinates: [31.1434, 121.8052], size: "large" },
@@ -3176,25 +3144,20 @@ function getCommercialAirports() {
         { code: "TSN", name: "Tianjin Binhai International", city: "Tianjin", country: "China", coordinates: [39.1244, 117.3464], size: "large" },
         { code: "CGO", name: "Zhengzhou Xinzheng International", city: "Zhengzhou", country: "China", coordinates: [34.5197, 113.8409], size: "large" },
         
-        // SOUTH KOREA
         { code: "ICN", name: "Incheon International", city: "Seoul", country: "South Korea", coordinates: [37.4602, 126.4407], size: "large" },
         { code: "GMP", name: "Gimpo International", city: "Seoul", country: "South Korea", coordinates: [37.5583, 126.7906], size: "large" },
         { code: "PUS", name: "Gimhae International", city: "Busan", country: "South Korea", coordinates: [35.1795, 128.9382], size: "large" },
         { code: "CJU", name: "Jeju International", city: "Jeju", country: "South Korea", coordinates: [33.5113, 126.4930], size: "large" },
         
-        // SINGAPORE
         { code: "SIN", name: "Singapore Changi", city: "Singapore", country: "Singapore", coordinates: [1.3644, 103.9915], size: "large" },
         
-        // HONG KONG
         { code: "HKG", name: "Hong Kong International", city: "Hong Kong", country: "China", coordinates: [22.3080, 113.9185], size: "large" },
         
-        // THAILAND
         { code: "BKK", name: "Suvarnabhumi Airport", city: "Bangkok", country: "Thailand", coordinates: [13.6811, 100.7475], size: "large" },
         { code: "DMK", name: "Don Mueang International", city: "Bangkok", country: "Thailand", coordinates: [13.9126, 100.6068], size: "large" },
         { code: "HKT", name: "Phuket International", city: "Phuket", country: "Thailand", coordinates: [8.1132, 98.3169], size: "large" },
         { code: "CNX", name: "Chiang Mai International", city: "Chiang Mai", country: "Thailand", coordinates: [18.7668, 98.9626], size: "large" },
         
-        // INDIA
         { code: "DEL", name: "Indira Gandhi International", city: "Delhi", country: "India", coordinates: [28.5562, 77.1000], size: "large" },
         { code: "BOM", name: "Chhatrapati Shivaji Maharaj International", city: "Mumbai", country: "India", coordinates: [19.0887, 72.8679], size: "large" },
         { code: "BLR", name: "Kempegowda International", city: "Bangalore", country: "India", coordinates: [13.1986, 77.7066], size: "large" },
@@ -3206,30 +3169,24 @@ function getCommercialAirports() {
         { code: "AMD", name: "Sardar Vallabhbhai Patel International", city: "Ahmedabad", country: "India", coordinates: [23.0772, 72.6346], size: "large" },
         { code: "PNQ", name: "Pune Airport", city: "Pune", country: "India", coordinates: [18.5821, 73.9197], size: "medium" },
         
-        // MALAYSIA
         { code: "KUL", name: "Kuala Lumpur International", city: "Kuala Lumpur", country: "Malaysia", coordinates: [2.7456, 101.7099], size: "large" },
         { code: "PEN", name: "Penang International", city: "Penang", country: "Malaysia", coordinates: [5.2971, 100.2769], size: "large" },
         
-        // INDONESIA
         { code: "CGK", name: "Soekarno–Hatta International", city: "Jakarta", country: "Indonesia", coordinates: [-6.1256, 106.6558], size: "large" },
         { code: "DPS", name: "Ngurah Rai International", city: "Denpasar", country: "Indonesia", coordinates: [-8.7482, 115.1672], size: "large" },
         { code: "SUB", name: "Juanda International", city: "Surabaya", country: "Indonesia", coordinates: [-7.3798, 112.7869], size: "large" },
         
-        // PHILIPPINES
         { code: "MNL", name: "Ninoy Aquino International", city: "Manila", country: "Philippines", coordinates: [14.5086, 121.0196], size: "large" },
         { code: "CEB", name: "Mactan–Cebu International", city: "Cebu", country: "Philippines", coordinates: [10.3070, 123.9790], size: "large" },
         { code: "DVO", name: "Francisco Bangoy International", city: "Davao", country: "Philippines", coordinates: [7.1255, 125.6458], size: "large" },
-        
-        // TAIWAN
+
         { code: "TPE", name: "Taiwan Taoyuan International", city: "Taipei", country: "Taiwan", coordinates: [25.0777, 121.2328], size: "large" },
         { code: "KHH", name: "Kaohsiung International", city: "Kaohsiung", country: "Taiwan", coordinates: [22.5771, 120.3500], size: "large" },
         
-        // VIETNAM
         { code: "SGN", name: "Tan Son Nhat International", city: "Ho Chi Minh City", country: "Vietnam", coordinates: [10.8188, 106.6520], size: "large" },
         { code: "HAN", name: "Noi Bai International", city: "Hanoi", country: "Vietnam", coordinates: [21.2212, 105.8072], size: "large" },
         { code: "DAD", name: "Da Nang International", city: "Da Nang", country: "Vietnam", coordinates: [16.0439, 108.1994], size: "large" },
         
-        // MIDDLE EAST
         { code: "DXB", name: "Dubai International", city: "Dubai", country: "UAE", coordinates: [25.2532, 55.3657], size: "large" },
         { code: "DWC", name: "Al Maktoum International", city: "Dubai", country: "UAE", coordinates: [24.8861, 55.1722], size: "large" },
         { code: "AUH", name: "Abu Dhabi International", city: "Abu Dhabi", country: "UAE", coordinates: [24.4330, 54.6511], size: "large" },
@@ -3246,7 +3203,6 @@ function getCommercialAirports() {
         { code: "BEY", name: "Beirut–Rafic Hariri International", city: "Beirut", country: "Lebanon", coordinates: [33.8209, 35.4884], size: "large" },
         { code: "CAI", name: "Cairo International", city: "Cairo", country: "Egypt", coordinates: [30.1219, 31.4056], size: "large" },
         
-        // AFRICA
         { code: "JNB", name: "O.R. Tambo International", city: "Johannesburg", country: "South Africa", coordinates: [-26.1392, 28.2460], size: "large" },
         { code: "CPT", name: "Cape Town International", city: "Cape Town", country: "South Africa", coordinates: [-33.9648, 18.6017], size: "large" },
         { code: "DUR", name: "King Shaka International", city: "Durban", country: "South Africa", coordinates: [-29.6144, 31.1190], size: "large" },
@@ -3265,7 +3221,6 @@ function getCommercialAirports() {
         { code: "ALG", name: "Houari Boumediene Airport", city: "Algiers", country: "Algeria", coordinates: [36.6910, 3.2154], size: "large" },
         { code: "TIP", name: "Tripoli International", city: "Tripoli", country: "Libya", coordinates: [32.6635, 13.1590], size: "large" },
         
-        // LATIN AMERICA
         { code: "GRU", name: "São Paulo–Guarulhos International", city: "São Paulo", country: "Brazil", coordinates: [-23.4356, -46.4731], size: "large" },
         { code: "CGH", name: "São Paulo–Congonhas", city: "São Paulo", country: "Brazil", coordinates: [-23.6261, -46.6564], size: "large" },
         { code: "GIG", name: "Rio de Janeiro–Galeão International", city: "Rio de Janeiro", country: "Brazil", coordinates: [-22.8089, -43.2436], size: "large" },
@@ -3291,7 +3246,6 @@ function getCommercialAirports() {
         { code: "LPB", name: "El Alto International", city: "La Paz", country: "Bolivia", coordinates: [-16.5133, -68.1923], size: "large" },
         { code: "VVI", name: "Viru Viru International", city: "Santa Cruz de la Sierra", country: "Bolivia", coordinates: [-17.6448, -63.1354], size: "large" },
         
-        // AUSTRALIA & NEW ZEALAND
         { code: "SYD", name: "Sydney Kingsford Smith", city: "Sydney", country: "Australia", coordinates: [-33.9399, 151.1753], size: "large" },
         { code: "MEL", name: "Melbourne Airport", city: "Melbourne", country: "Australia", coordinates: [-37.6733, 144.8433], size: "large" },
         { code: "BNE", name: "Brisbane Airport", city: "Brisbane", country: "Australia", coordinates: [-27.3842, 153.1175], size: "large" },
@@ -3307,7 +3261,6 @@ function getCommercialAirports() {
         { code: "NAN", name: "Nadi International", city: "Nadi", country: "Fiji", coordinates: [-17.7554, 177.4434], size: "medium" },
         { code: "PPT", name: "Faa'a International", city: "Papeete", country: "French Polynesia", coordinates: [-17.5567, -149.6114], size: "medium" },
         
-        // ANCHORAGE (MISSING FROM YOUR LIST!)
         { code: "ANC", name: "Ted Stevens Anchorage International", city: "Anchorage", country: "USA", coordinates: [61.1744, -149.9960], size: "large" }
     ];
 }
@@ -3839,17 +3792,14 @@ function getCommercialAirports() {
     
     
 function cleanupRouteRendering() {
-    // Just clear the layers, don't recreate the layer group
     if (routeLayer) {
         routeLayer.clearLayers();
     }
     
-    // Clear any references to old layers
     window.currentRouteLayer = null;
 }
 
 function renderPath(route) {
-    // Simple cleanup
     routeLayer.clearLayers();
     
     if (!route || !route.geometry) return;
@@ -3857,12 +3807,10 @@ function renderPath(route) {
     const coords = route.geometry.coordinates || [];
     if (coords.length < 2) return;
     
-    // Get route color
     const routeColor = getRouteColor(route);
     let weight = 5;
     let dashArray = null;
     
-    // Set styling based on route type
     if (route.id === 'driving') {
         weight = 5;
     } else if (route.id === 'cycling') {
@@ -3875,7 +3823,6 @@ function renderPath(route) {
         dashArray = '10, 5';
     }
     
-    // IMPORTANT: Use Leaflet's built-in GeoJSON parser
     const geoJsonLayer = L.geoJSON(route.geometry, {
         style: { 
             color: routeColor, 
@@ -3885,15 +3832,12 @@ function renderPath(route) {
         }
     });
     
-    // Add to routeLayer
     geoJsonLayer.addTo(routeLayer);
     
-    // Store reference for cleanup
     window.currentRouteGeoJson = geoJsonLayer;
     
     currentRoute = route;
     
-    // Show start navigation button
     const startBtn = document.getElementById('start-nav-btn');
     startBtn.classList.remove('hidden');
     startBtn.style.display = '';
@@ -3901,34 +3845,29 @@ function renderPath(route) {
 }
 
     function getRouteColor(route) {
-    // Default colors for non-driving modes
-    if (route.id === 'cycling') return '#38bdf8'; // Green
-    if (route.id === 'walking') return '#38bdf8'; // Purple
-    if (route.id === 'flight') return '#38bdf8';  // Sky blue
+    if (route.id === 'cycling') return '#38bdf8';
+    if (route.id === 'walking') return '#38bdf8';
+    if (route.id === 'flight') return '#38bdf8';
     
     if (route.id === 'driving') {
-        if (route.traffic === 'high') return '#ef4444';    // Red for heavy traffic
-        if (route.traffic === 'medium') return '#f59e0b';  // Yellow for medium traffic
-        return '#3b82f6';  // Blue for light/no traffic
+        if (route.traffic === 'high') return '#ef4444';
+        if (route.traffic === 'medium') return '#f59e0b';
+        return '#3b82f6';
     }
     
-    // Default fallback
-    return '#3b82f6'; // Blue
+    return '#3b82f6';
 }
 
 function drawNavigationRoute(latLngs, route) {
-    // Clear any existing navigation layers
     if (window.navigationGeoJson && map.hasLayer(window.navigationGeoJson)) {
         map.removeLayer(window.navigationGeoJson);
     }
     
     const routeColor = getRouteColor(route);
     const weight = 5;
-    
-    // latLngs are [lat, lng] arrays, convert to GeoJSON [lng, lat]
+
     const coordinates = latLngs.map(point => {
-        // point is [lat, lng]
-        return [point[1], point[0]];  // Convert to [lng, lat]
+        return [point[1], point[0]];
     });
     
     const geoJsonGeometry = {
@@ -3936,7 +3875,6 @@ function drawNavigationRoute(latLngs, route) {
         coordinates: coordinates
     };
     
-    // Use GeoJSON for navigation
     window.navigationGeoJson = L.geoJSON(geoJsonGeometry, {
         style: { 
             color: routeColor, 
@@ -5101,7 +5039,6 @@ function exitNavigation() {
     isNavigating = false;
     document.body.classList.remove('navigating');
     
-    // Clean up GeoJSON layers
     if (window.navigationGeoJson && map.hasLayer(window.navigationGeoJson)) {
         map.removeLayer(window.navigationGeoJson);
         window.navigationGeoJson = null;
@@ -5112,17 +5049,14 @@ function exitNavigation() {
         window.currentRouteGeoJson = null;
     }
     
-    // Clear routeLayer
     routeLayer.clearLayers();
 
-closeSidebar();
+    closeSidebar();
     
-    // Reset UI
     document.getElementById('standard-ui').style.display = 'flex';
     document.getElementById('active-nav-hud').style.display = 'none';
     document.getElementById('start-nav-btn').classList.add('hidden');
     
-    // Clear references
     currentNavRoute = null;
     currentStepIndex = 0;
 }
