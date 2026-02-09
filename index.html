@@ -182,10 +182,10 @@ body.navigating .nav-hud-eta { display: block; }
 body.navigating .nav-hud-acc { display: none; }
 body.navigating .nav-hud-distance { display: block; }
 
-.nav-hud-pos::before { content: "Pos  "; }
-.nav-hud-eta::before { content: "ETA  "; } 
-.nav-hud-acc::before { content: "Acc  "; }
-.nav-hud-distance::before { content: "Left  "; } 
+.nav-hud-pos::before { content: "Pos:  "; }
+.nav-hud-eta::before { content: "ETA:  "; } 
+.nav-hud-acc::before { content: "Acc:  "; }
+.nav-hud-distance::before { content: "Left:  "; } 
 
 /* Custom start point UI */
 #custom-start-panel {
@@ -906,7 +906,7 @@ width: 92% !important;
     </div>
 
     <div class="absolute bottom-6 left-6 z-[1000] pointer-events-none flex flex-col gap-4 ui-animate">
-<div class="strike-glass px-4 py-3 flex gap-6 items-center pointer-events-auto">
+<div class="strike-glass px-4 py-3 flex gap-6 items-center pointer-events-auto"style="max-width: fit-content;">
     <div class="flex flex-col">
         <span id="hud-coords" class="nav-hud-pos text-[10px] font-mono text-white mt-1">0.0, 0.0</span>
         <span id="hud-eta" class="nav-hud-eta text-[10px] font-mono text-emerald-400 mt-1">--:--</span>
@@ -1228,6 +1228,334 @@ async function getRealTimeTraffic(start, end) {
         
         return { hasFerry: false };
     }
+
+async function getLocationImages(lat, lng, name, addressDetails = {}) {
+    // First, analyze if this is a generic street or actual place
+    const isGenericStreet = isGenericLocationName(name, addressDetails);
+    
+    // If it's a generic street, skip Wikipedia (unless it's famous)
+    if (isGenericStreet && !isFamousStreet(name, addressDetails.city)) {
+        return {
+            image: null,
+            description: '',
+            source: null,
+            relevance: 'low'
+        };
+    }
+    
+    // Try Wikipedia with better filtering
+    try {
+        const wikiResponse = await fetch(
+            `https://en.wikipedia.org/w/api.php?action=query&format=json&prop=pageimages|extracts|coordinates&titles=${encodeURIComponent(name)}&exintro=1&explaintext=1&pithumbsize=400&colimit=1&origin=*`
+        );
+        const wikiData = await wikiResponse.json();
+        
+        const pages = wikiData.query?.pages;
+        if (pages) {
+            const page = Object.values(pages)[0];
+            
+            // Check if this is actually a notable place
+            if (isNotableWikipediaPage(page)) {
+                if (page.thumbnail?.source) {
+                    return {
+                        image: page.thumbnail.source,
+                        description: page.extract || '',
+                        wikipediaUrl: `https://en.wikipedia.org/wiki/${encodeURIComponent(page.title)}`,
+                        source: 'Wikipedia',
+                        relevance: 'high'
+                    };
+                }
+            }
+        }
+    } catch (error) {
+        console.error("Wikipedia error:", error);
+    }
+    
+    // Try Wikimedia Commons with geographic relevance
+    try {
+        // Search for images near this location with location-specific terms
+        const searchTerms = generateLocationSearchTerms(name, addressDetails);
+        
+        for (const term of searchTerms) {
+            const commonsResponse = await fetch(
+                `https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(term)}&gsrnamespace=6&gsrlimit=3&prop=imageinfo&iiprop=url|extmetadata&iiurlwidth=400&format=json&origin=*`
+            );
+            const commonsData = await commonsResponse.json();
+            
+            const pages = commonsData.query?.pages;
+            if (pages) {
+                // Find the most relevant image
+                const relevantImage = findMostRelevantImage(pages, name, addressDetails);
+                if (relevantImage) {
+                    return {
+                        image: relevantImage.url,
+                        description: relevantImage.description || `Image related to ${name}`,
+                        source: 'Wikimedia Commons',
+                        relevance: 'medium'
+                    };
+                }
+            }
+        }
+    } catch (error) {
+        console.error("Wikimedia Commons error:", error);
+    }
+    
+    // Try OpenStreetMap Nomination for notable features
+    try {
+        const notableFeature = await getNotableFeatureFromOSM(lat, lng);
+        if (notableFeature && notableFeature.wikipedia_image) {
+            return {
+                image: notableFeature.wikipedia_image,
+                description: notableFeature.description || '',
+                source: 'OpenStreetMap + Wikipedia',
+                relevance: 'high'
+            };
+        }
+    } catch (error) {
+        console.error("OSM feature error:", error);
+    }
+    
+    // No relevant image available
+    return {
+        image: null,
+        description: '',
+        source: null,
+        relevance: 'none'
+    };
+}
+
+// Helper functions for intelligent filtering
+
+function isGenericLocationName(name, addressDetails) {
+    const genericTerms = [
+        'street', 'st', 'road', 'rd', 'avenue', 'ave', 'boulevard', 'blvd', 
+        'drive', 'dr', 'lane', 'ln', 'court', 'ct', 'place', 'pl', 'way',
+        'highway', 'hwy', 'freeway', 'fwy', 'expressway', 'expy', 'parkway', 'pkwy',
+        'route', 'rt', 'circle', 'cir', 'terrace', 'ter', 'trail', 'trl'
+    ];
+    
+    const nameLower = name.toLowerCase();
+    
+    // Check if name ends with generic street terms
+    for (const term of genericTerms) {
+        if (nameLower.includes(` ${term}`) || nameLower.endsWith(` ${term}`)) {
+            return true;
+        }
+    }
+    
+    // Check if it's just a number (like "5th Street")
+    if (/^\d+(st|nd|rd|th)\s/.test(nameLower) || /^\d+$/.test(name)) {
+        return true;
+    }
+    
+    // Check if it's a common route number
+    if (/^(I-|US-|SR-|CR-|Route\s\d+)/i.test(name)) {
+        return true;
+    }
+    
+    return false;
+}
+
+function isFamousStreet(name, city) {
+    const famousStreets = [
+        'wall street', 'broadway', 'fifth avenue', 'rodeo drive', 'sunset boulevard',
+        'lombard street', 'bourbon street', 'abbey road', 'champs-élysées',
+        'las vegas strip', 'times square', 'piccadilly circus', 'trafalgar square'
+    ];
+    
+    // Check globally famous streets
+    const nameLower = name.toLowerCase();
+    if (famousStreets.includes(nameLower)) {
+        return true;
+    }
+    
+    // Check city-specific famous streets
+    const cityFamousStreets = {
+        'new york': ['wall street', 'broadway', 'fifth avenue', 'madison avenue', 'park avenue'],
+        'los angeles': ['rodeo drive', 'sunset boulevard', 'hollywood boulevard'],
+        'san francisco': ['lombard street', 'market street'],
+        'london': ['abbey road', 'oxford street', 'regent street', 'baker street'],
+        'paris': ['champs-élysées', 'rue de rivoli'],
+        'chicago': ['magnificent mile', 'state street'],
+        'miami': ['ocean drive', 'lincoln road']
+    };
+    
+    if (city && cityFamousStreets[city.toLowerCase()]) {
+        return cityFamousStreets[city.toLowerCase()].includes(nameLower);
+    }
+    
+    return false;
+}
+
+function isNotableWikipediaPage(page) {
+    // Check if page has sufficient content to be notable
+    if (!page.extract || page.extract.length < 50) {
+        return false;
+    }
+    
+    // Check for redirects
+    if (page.redirect) {
+        return false;
+    }
+    
+    // Check if it's a disambiguation page
+    if (page.title && (page.title.includes('(disambiguation)') || 
+                       page.extract.includes('may refer to'))) {
+        return false;
+    }
+    
+    // Check page length in characters
+    if (page.length && page.length < 500) {
+        return false;
+    }
+    
+    return true;
+}
+
+function generateLocationSearchTerms(name, addressDetails) {
+    const terms = [];
+    
+    // Add city-specific searches if we have city info
+    if (addressDetails.city) {
+        terms.push(`${name} ${addressDetails.city}`);
+        terms.push(`${addressDetails.city} ${name}`);
+    }
+    
+    // Add landmark-specific searches
+    terms.push(`${name} landmark`);
+    terms.push(`${name} building`);
+    terms.push(`${name} architecture`);
+    
+    // Add the plain name (as last resort)
+    terms.push(name);
+    
+    return terms;
+}
+
+function findMostRelevantImage(pages, name, addressDetails) {
+    const images = [];
+    
+    for (const pageId in pages) {
+        const page = pages[pageId];
+        if (page.imageinfo && page.imageinfo[0]) {
+            const imageInfo = page.imageinfo[0];
+            
+            // Score the image relevance
+            let score = 0;
+            
+            // Check filename for relevance
+            const filename = page.title.toLowerCase();
+            const nameLower = name.toLowerCase();
+            
+            if (filename.includes(nameLower.replace(/\s+/g, '_'))) {
+                score += 3;
+            }
+            
+            if (filename.includes('panorama') || filename.includes('aerial')) {
+                score += 2;
+            }
+            
+            if (filename.includes('night') || filename.includes('dusk') || filename.includes('dawn')) {
+                score += 1;
+            }
+            
+            // Check metadata if available
+            if (imageInfo.extmetadata) {
+                const metadata = imageInfo.extmetadata;
+                
+                if (metadata.ImageDescription && metadata.ImageDescription.value) {
+                    const desc = metadata.ImageDescription.value.toLowerCase();
+                    if (desc.includes(nameLower)) score += 2;
+                    if (desc.includes('landmark')) score += 3;
+                    if (desc.includes('building')) score += 2;
+                    if (desc.includes('architecture')) score += 2;
+                }
+                
+                if (metadata.DateTimeOriginal) {
+                    // Prefer newer images
+                    const year = new Date(metadata.DateTimeOriginal.value).getFullYear();
+                    if (year > 2010) score += 1;
+                }
+            }
+            
+            images.push({
+                url: imageInfo.thumburl,
+                description: imageInfo.extmetadata?.ImageDescription?.value || '',
+                score: score
+            });
+        }
+    }
+    
+    // Return the highest scoring image
+    images.sort((a, b) => b.score - a.score);
+    return images[0];
+}
+
+async function getNotableFeatureFromOSM(lat, lng) {
+    try {
+        const response = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1&namedetails=1`
+        );
+        const data = await response.json();
+        
+        // Check if this is a notable feature
+        if (data.namedetails) {
+            const names = data.namedetails;
+            
+            // Look for Wikipedia links in OSM data
+            if (data.extratags) {
+                const extras = data.extratags;
+                
+                // Check for Wikipedia/Commons links
+                const wikipedia = extras.wikipedia || extras['wikipedia:en'] || extras['wikipedia'];
+                const wikidata = extras.wikidata;
+                const image = extras.image || extras['image:0'] || extras['image:1'];
+                
+                if (wikipedia) {
+                    // Extract page title from Wikipedia URL
+                    const pageTitle = wikipedia.split(':').slice(1).join(':');
+                    
+                    // Try to get image from Wikipedia page
+                    const wikiImageResponse = await fetch(
+                        `https://en.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(pageTitle)}&prop=pageimages&format=json&pithumbsize=400&origin=*`
+                    );
+                    const wikiImageData = await wikiImageResponse.json();
+                    
+                    const pages = wikiImageData.query?.pages;
+                    if (pages) {
+                        const page = Object.values(pages)[0];
+                        if (page.thumbnail?.source) {
+                            return {
+                                name: names.name || names['name:en'] || Object.values(names)[0],
+                                description: `Notable feature: ${names.name || ''}`,
+                                wikipedia_image: page.thumbnail.source,
+                                wikipedia_url: `https://en.wikipedia.org/wiki/${encodeURIComponent(pageTitle)}`
+                            };
+                        }
+                    }
+                }
+            }
+            
+            // Check if it's a notable building/landmark
+            const notableTypes = [
+                'historic', 'tourism', 'amenity', 'building', 'leisure',
+                'man_made', 'natural', 'place_of_worship', 'shop'
+            ];
+            
+            if (data.category && notableTypes.includes(data.category)) {
+                return {
+                    name: names.name || names['name:en'] || Object.values(names)[0],
+                    description: `${data.category}: ${names.name || ''}`,
+                    type: data.category
+                };
+            }
+        }
+    } catch (error) {
+        console.error("OSM notable feature error:", error);
+    }
+    
+    return null;
+}
 
     function findNearestTerminal(point, terminals) {
         const [lat, lng] = point;
@@ -2190,76 +2518,235 @@ async function getRealTimeTraffic(start, end) {
     }
     
     async function triggerAnalysis(lat, lng) {
-       
-        if (destinationMarker && map.hasLayer(destinationMarker)) {
+if (destinationMarker && map.hasLayer(destinationMarker)) {
             map.removeLayer(destinationMarker);
         }
-        selectedTarget = [lat, lng];
-        const sidebar = document.getElementById('info-sidebar');
-        sidebar.classList.add('active');
-        routeLayer.clearLayers();
-        document.getElementById('start-nav-btn').classList.add('hidden');
-        updateDestinationMarker(lat, lng);
-        
-        document.getElementById('side-title').innerText = "Processing...";
-        
-        try {
-            const res = await fetch(`https://photon.komoot.io/reverse?lon=${lng}&lat=${lat}&limit=1`);
-            const data = await res.json();
-            
-            if (data.features && data.features.length > 0) {
-                const p = data.features[0].properties || {};
-                const locationName = p.name || p.street || "Selected Location";
-                document.getElementById('side-title').innerText = 
-                    p.name || p.street || "Selected Location";
-                document.getElementById('sidebar-content').innerHTML = `
-                    <div class="space-y-6">
-                        <div id="logistics-module">
-                            <span class="text-[9px] font-bold text-neutral-500 uppercase tracking-widest block mb-4">Routes via Engine</span>
-                            <div id="route-options" class="flex flex-col gap-2"></div>
-                        </div>
-                        <div class="space-y-2">
-                            <span class="text-[9px] font-bold text-neutral-500 uppercase tracking-widest block">Address</span>
-                            <p class="text-xs text-neutral-400 leading-relaxed">${[p.street, p.city, p.country, p.postcode].filter(Boolean).join(', ') || `${lat.toFixed(6)}, ${lng.toFixed(6)}`}</p>
-                        </div>
-                    </div>
-                `;
 
-                updateDestinationMarker(lat, lng, locationName);
-            } else {
-                document.getElementById('side-title').innerText = "Location";
-                document.getElementById('sidebar-content').innerHTML = `
-                    <div class="space-y-6">
-                        <div id="logistics-module">
-                            <span class="text-[9px] font-bold text-neutral-500 uppercase tracking-widest block mb-4">Routes via Engine</span>
-                            <div id="route-options" class="flex flex-col gap-2"></div>
-                        </div>
-                        <div class="space-y-2">
-                            <span class="text-[9px] font-bold text-neutral-500 uppercase tracking-widest block">Address</span>
-                            <p class="text-xs text-neutral-400 leading-relaxed">${lat.toFixed(6)}, ${lng.toFixed(6)}</p>
+    selectedTarget = [lat, lng];
+    const sidebar = document.getElementById('info-sidebar');
+    sidebar.classList.add('active');
+    routeLayer.clearLayers();
+    document.getElementById('start-nav-btn').classList.add('hidden');
+    updateDestinationMarker(lat, lng);
+    
+    document.getElementById('side-title').innerText = "Processing...";
+    
+    try {
+        const res = await fetch(`https://photon.komoot.io/reverse?lon=${lng}&lat=${lat}&limit=1`);
+        const data = await res.json();
+        
+        if (data.features && data.features.length > 0) {
+            const p = data.features[0].properties || {};
+            const locationName = p.name || p.street || "Selected Location";
+
+    const addressDetails = {
+        city: p.city,
+        country: p.country,
+        street: p.street,
+        housenumber: p.housenumber,
+        postcode: p.postcode
+    };
+    
+    // Get image data with filtering
+    const imageData = await getLocationImages(lat, lng, locationName, addressDetails);
+    
+    // Only show image if it has high/medium relevance
+    const shouldShowImage = imageData.relevance === 'high' || imageData.relevance === 'medium';
+                        
+            document.getElementById('side-title').innerText = locationName;
+            
+            // Build the address string
+            const addressParts = [p.street, p.city, p.country, p.postcode].filter(Boolean);
+            const addressString = addressParts.length > 0 ? 
+                addressParts.join(', ') : 
+                `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+            
+            // Build the HTML with consistent UI
+            let sidebarHTML = `
+                <div class="space-y-6">
+                    <!-- IMAGE SECTION -->
+                    ${imageData.image ? `
+                    <div class="relative h-48 rounded-xl overflow-hidden">
+                        <img src="${imageData.image}" 
+                             class="w-full h-full object-cover"
+                             alt="${locationName}"
+                             onerror="this.style.display='none'; this.parentElement.style.display='none';">
+                        <div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent p-4">
+                            ${imageData.source ? `
+                            <div class="flex items-center gap-2 mb-2">
+                                <iconify-icon icon="lucide:camera" class="text-white/70 text-sm"></iconify-icon>
+                                <span class="text-xs text-white/70">${imageData.source}</span>
+                            </div>
+                            ` : ''}
+                            <h3 class="text-lg font-bold text-white">${locationName}</h3>
                         </div>
                     </div>
-                `;
-            }
-        } catch (error) {
-            document.getElementById('side-title').innerText = "Target Location";
-            document.getElementById('sidebar-content').innerHTML = `
-                <div class="space-y-6">
+                    ` : `
+                    <!-- Placeholder when no image -->
+                    <div class="h-32 rounded-xl bg-gradient-to-br from-gray-900 to-black border border-white/10 flex items-center justify-center">
+                        <div class="text-center">
+                            <iconify-icon icon="lucide:map-pin" class="text-3xl text-white/30 mb-2"></iconify-icon>
+                            <div class="text-sm text-white/50">${locationName}</div>
+                        </div>
+                    </div>
+                    `}
+                    
+                    <!-- DESCRIPTION (if available) -->
+                    ${imageData.description ? `
+                    <div class="space-y-2">
+                        <div class="flex items-center gap-2">
+                            <iconify-icon icon="lucide:info" class="text-neutral-500"></iconify-icon>
+                            <span class="text-[9px] font-bold text-neutral-500 uppercase tracking-widest">About</span>
+                        </div>
+                        <p class="text-xs text-neutral-300 leading-relaxed line-clamp-3">${imageData.description.substring(0, 200)}${imageData.description.length > 200 ? '...' : ''}</p>
+                        ${imageData.wikipediaUrl ? `
+                        <a href="${imageData.wikipediaUrl}" target="_blank" class="inline-flex items-center gap-1 text-xs text-sky-400 hover:text-sky-300 mt-1">
+                            <iconify-icon icon="lucide:external-link" class="text-[10px]"></iconify-icon>
+                            Read more on Wikipedia
+                        </a>
+                        ` : ''}
+                    </div>
+                    ` : ''}
+                    
+                    <!-- ADDRESS SECTION -->
+                    <div class="space-y-2">
+                        <div class="flex items-center gap-2">
+                            <iconify-icon icon="lucide:map-pin" class="text-neutral-500"></iconify-icon>
+                            <span class="text-[9px] font-bold text-neutral-500 uppercase tracking-widest">Address</span>
+                        </div>
+                        <p class="text-xs text-neutral-300 leading-relaxed">${addressString}</p>
+                        <button onclick="copyToClipboard('${addressString.replace(/'/g, "\\'")}', event)" 
+                                class="inline-flex items-center gap-1 text-xs text-emerald-400 hover:text-emerald-300 mt-1">
+                            <iconify-icon icon="lucide:copy" class="text-[10px]"></iconify-icon>
+                            Copy Address
+                        </button>
+                    </div>
+                    
+                    <!-- ROUTES SECTION -->
                     <div id="logistics-module">
-                        <span class="text-[9px] font-bold text-neutral-500 uppercase tracking-widest block mb-4">Routes via Engine</span>
+                        <div class="flex items-center gap-2 mb-4">
+                            <iconify-icon icon="lucide:route" class="text-neutral-500"></iconify-icon>
+                            <span class="text-[9px] font-bold text-neutral-500 uppercase tracking-widest">Routes</span>
+                        </div>
                         <div id="route-options" class="flex flex-col gap-2"></div>
                     </div>
+                </div>
+            `;
+            
+            document.getElementById('sidebar-content').innerHTML = sidebarHTML;
+            
+            updateDestinationMarker(lat, lng, locationName);
+            
+        } else {
+            // Fallback for no reverse geocoding results
+            const imageData = await getLocationImages(lat, lng, "Location");
+            
+            document.getElementById('side-title').innerText = "Location";
+            document.getElementById('sidebar-content').innerHTML = `
+                <div class="space-y-6">
+                    ${imageData.image ? `
+                    <div class="relative h-48 rounded-xl overflow-hidden">
+                        <img src="${imageData.image}" 
+                             class="w-full h-full object-cover"
+                             alt="Location"
+                             onerror="this.style.display='none'; this.parentElement.style.display='none';">
+                        <div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent p-4">
+                            <h3 class="text-lg font-bold text-white">Selected Location</h3>
+                        </div>
+                    </div>
+                    ` : `
+                    <div class="h-32 rounded-xl bg-gradient-to-br from-gray-900 to-black border border-white/10 flex items-center justify-center">
+                        <div class="text-center">
+                            <iconify-icon icon="lucide:map-pin" class="text-3xl text-white/30 mb-2"></iconify-icon>
+                            <div class="text-sm text-white/50">Selected Location</div>
+                        </div>
+                    </div>
+                    `}
+                    
                     <div class="space-y-2">
-                        <span class="text-[9px] font-bold text-neutral-500 uppercase tracking-widest block">Address</span>
-                        <p class="text-xs text-neutral-400 leading-relaxed">${lat.toFixed(6)}, ${lng.toFixed(6)}</p>
+                        <div class="flex items-center gap-2">
+                            <iconify-icon icon="lucide:map-pin" class="text-neutral-500"></iconify-icon>
+                            <span class="text-[9px] font-bold text-neutral-500 uppercase tracking-widest">Coordinates</span>
+                        </div>
+                        <p class="text-xs text-neutral-300 leading-relaxed">${lat.toFixed(6)}, ${lng.toFixed(6)}</p>
+                        <button onclick="copyToClipboard('${lat.toFixed(6)}, ${lng.toFixed(6)}')" 
+                                class="inline-flex items-center gap-1 text-xs text-emerald-400 hover:text-emerald-300 mt-1">
+                            <iconify-icon icon="lucide:copy" class="text-[10px]"></iconify-icon>
+                            Copy Coordinates
+                        </button>
+                    </div>
+                    
+                    <div id="logistics-module">
+                        <div class="flex items-center gap-2 mb-4">
+                            <iconify-icon icon="lucide:route" class="text-neutral-500"></iconify-icon>
+                            <span class="text-[9px] font-bold text-neutral-500 uppercase tracking-widest">Routes via Engine</span>
+                        </div>
+                        <div id="route-options" class="flex flex-col gap-2"></div>
                     </div>
                 </div>
             `;
         }
-        
-        calculateRoutes(getCurrentStartPoint(), [lat, lng]);
+    } catch (error) {
+        console.error("Analysis failed:", error);
+        document.getElementById('side-title').innerText = "Target Location";
+        document.getElementById('sidebar-content').innerHTML = `
+            <div class="space-y-6">
+                <div class="h-32 rounded-xl bg-gradient-to-br from-gray-900 to-black border border-white/10 flex items-center justify-center">
+                    <div class="text-center">
+                        <iconify-icon icon="lucide:map-pin" class="text-3xl text-white/30 mb-2"></iconify-icon>
+                        <div class="text-sm text-white/50">Selected Location</div>
+                    </div>
+                </div>
+                
+                <div class="space-y-2">
+                    <div class="flex items-center gap-2">
+                        <iconify-icon icon="lucide:map-pin" class="text-neutral-500"></iconify-icon>
+                        <span class="text-[9px] font-bold text-neutral-500 uppercase tracking-widest">Coordinates</span>
+                    </div>
+                    <p class="text-xs text-neutral-300 leading-relaxed">${lat.toFixed(6)}, ${lng.toFixed(6)}</p>
+                </div>
+                
+                <div id="logistics-module">
+                    <div class="flex items-center gap-2 mb-4">
+                        <iconify-icon icon="lucide:route" class="text-neutral-500"></iconify-icon>
+                        <span class="text-[9px] font-bold text-neutral-500 uppercase tracking-widest">Routes via Engine</span>
+                    </div>
+                    <div id="route-options" class="flex flex-col gap-2"></div>
+                </div>
+            </div>
+        `;
     }
     
+    // Calculate routes
+    calculateRoutes(getCurrentStartPoint(), [lat, lng]);
+}
+
+// Update the copyToClipboard function to accept the event parameter
+function copyToClipboard(text, event) {
+    // Prevent default if event exists
+    if (event) event.preventDefault();
+    
+    navigator.clipboard.writeText(text).then(() => {
+        // Show success feedback
+        const button = event ? event.currentTarget : document.activeElement;
+        const originalHTML = button.innerHTML;
+        button.innerHTML = `
+            <iconify-icon icon="lucide:check" class="text-[10px]"></iconify-icon>
+            Copied!
+        `;
+        button.classList.remove('text-emerald-400');
+        button.classList.add('text-green-400');
+        
+        setTimeout(() => {
+            button.innerHTML = originalHTML;
+            button.classList.remove('text-green-400');
+            button.classList.add('text-emerald-400');
+        }, 2000);
+    }).catch(err => {
+        console.error('Failed to copy:', err);
+    });
+}
+ 
     async function fetchGraphHopperRoute(start, end, mode) {
         try {
             const vehicle = mode === 'driving' ? 'car' : 
