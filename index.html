@@ -1033,49 +1033,111 @@ async function getRealTimeTraffic(start, end) {
 }
 
     async function getRealTrafficEstimate(start, end) {
-        try {
-            const response = await fetch(
-                `https://router.project-osrm.org/route/v1/driving/${start[1]},${start[0]};${end[1]},${end[0]}?overview=false&alternatives=false&steps=true`
-            );
-            const data = await response.json();
-            
-            if (data.routes && data.routes.length > 0) {
-                const route = data.routes[0];
-                const now = new Date();
-                const hour = now.getHours();
-                const isRushHour = (hour >= 7 && hour <= 9) || (hour >= 16 && hour <= 18);
-                const isWeekend = now.getDay() === 0 || now.getDay() === 6;
-                
-                const steps = route.legs?.[0]?.steps || [];
-                const intersections = steps.filter(step => 
-                    step.maneuver?.type.includes('turn') || 
-                    step.maneuver?.type.includes('roundabout')
-                ).length;
-                
-                let trafficFactor = 1.0;
-                if (isRushHour && !isWeekend) trafficFactor *= 1.4;
-                if (intersections > 10) trafficFactor *= 1.2;
-                
-                const weather = await getRealWeatherAtLocation(start[0], start[1]);
-                if (weather?.conditions === "Rainy") trafficFactor *= 1.3;
-                if (weather?.conditions === "Snowy") trafficFactor *= 1.6;
-                
-                return {
-                    duration: route.duration * trafficFactor,
-                    trafficLevel: trafficFactor > 1.4 ? 'high' : trafficFactor > 1.2 ? 'medium' : 'low',
-                    intersections: intersections,
-                    weatherImpact: weather?.conditions || "Clear"
-                };
-            }
-        } catch (error) {}
+    try {
+        const response = await fetch(
+            `https://router.project-osrm.org/route/v1/driving/${start[1]},${start[0]};${end[1]},${end[0]}?overview=false&alternatives=false&steps=true`
+        );
+        const data = await response.json();
         
-        return {
-            duration: null,
-            trafficLevel: 'medium',
-            intersections: 0,
-            weatherImpact: "Unknown"
-        };
+        if (data.routes && data.routes.length > 0) {
+            const route = data.routes[0];
+            const now = new Date();
+            const hour = now.getHours();
+            const day = now.getDay();
+            
+            // More realistic traffic factors based on Google Maps patterns
+            let trafficFactor = 1.0;
+            
+            // Rush hour adjustments
+            const isWeekday = day >= 1 && day <= 5;
+            const isWeekend = day === 0 || day === 6;
+            
+            if (isWeekday) {
+                // Weekday rush hours
+                if ((hour >= 7 && hour <= 9) || (hour >= 16 && hour <= 19)) {
+                    trafficFactor = 1.4; // 40% longer during rush hour
+                } else if ((hour >= 12 && hour <= 14)) {
+                    trafficFactor = 1.2; // 20% longer during lunch
+                }
+            } else if (isWeekend) {
+                // Weekend traffic (usually lighter but can be heavy in tourist areas)
+                if ((hour >= 10 && hour <= 16)) {
+                    trafficFactor = 1.2; // 20% longer on weekend afternoons
+                }
+            }
+            
+            // Weather impact
+            const weather = await getRealWeatherAtLocation(start[0], start[1]);
+            if (weather?.conditions === "Rainy") trafficFactor *= 1.3;
+            if (weather?.conditions === "Snowy") trafficFactor *= 1.6;
+            if (weather?.conditions === "Foggy") trafficFactor *= 1.2;
+            
+            // Road type adjustments
+            const steps = route.legs?.[0]?.steps || [];
+            let highwayPercent = 0;
+            let cityStreetPercent = 0;
+            
+            steps.forEach(step => {
+                if (step.name?.toLowerCase().includes('highway') || 
+                    step.name?.toLowerCase().includes('freeway') ||
+                    step.name?.toLowerCase().includes('interstate')) {
+                    highwayPercent += step.distance / route.distance;
+                } else {
+                    cityStreetPercent += step.distance / route.distance;
+                }
+            });
+            
+            // City streets are slower
+            if (cityStreetPercent > 0.7) {
+                trafficFactor *= 1.2;
+            }
+            
+            // Intersection count
+            const intersections = steps.filter(step => 
+                step.maneuver?.type.includes('turn') || 
+                step.maneuver?.type.includes('roundabout') ||
+                step.maneuver?.type === 'new name'
+            ).length;
+            
+            if (intersections > route.distance / 1000) { // More than 1 intersection per km
+                trafficFactor *= 1.1;
+            }
+            
+            return {
+                duration: route.duration * trafficFactor,
+                trafficLevel: trafficFactor > 1.35 ? 'high' : trafficFactor > 1.15 ? 'medium' : 'low',
+                intersections: intersections,
+                weatherImpact: weather?.conditions || "Clear",
+                highwayPercent: highwayPercent,
+                estimatedSpeed: (route.distance / (route.duration * trafficFactor)) * 3.6
+            };
+        }
+    } catch (error) {
+        console.error("Traffic estimate failed:", error);
     }
+    
+    // Fallback calculation
+    const distance = map.distance(start, end);
+    const baseTime = (distance / 50000) * 3600; // Base speed 50 km/h (~31 mph)
+    
+    const now = new Date();
+    const hour = now.getHours();
+    let trafficFactor = 1.0;
+    
+    if ((hour >= 7 && hour <= 9) || (hour >= 16 && hour <= 19)) {
+        trafficFactor = 1.4;
+    } else if (hour >= 12 && hour <= 14) {
+        trafficFactor = 1.2;
+    }
+    
+    return {
+        duration: baseTime * trafficFactor,
+        trafficLevel: trafficFactor > 1.35 ? 'high' : trafficFactor > 1.15 ? 'medium' : 'low',
+        intersections: 0,
+        weatherImpact: "Unknown",
+        estimatedSpeed: 50 / trafficFactor
+    };
+}
 
     async function getAllAirports() {
         try {
@@ -1350,16 +1412,71 @@ function isNotableWikipediaPage(page) {
 function generateLocationSearchTerms(name, addressDetails) {
     const terms = [];
     
-    if (addressDetails.city) {
-        terms.push(`${name} ${addressDetails.city}`);
-        terms.push(`${addressDetails.city} ${name}`);
+    const city = addressDetails.city || '';
+    const state = addressDetails.state || '';
+    const country = addressDetails.country || '';
+    const county = addressDetails.county || '';
+    const type = addressDetails.type || '';
+    const osm_key = addressDetails.osm_key || '';
+    
+    const fullLocation = [city, county, state, country].filter(Boolean).join(' ');
+    
+    if (fullLocation) {
+        terms.push(`${name} ${fullLocation}`);
+        terms.push(`${fullLocation} ${name}`);
+    }
+    
+    if (city && state) {
+        terms.push(`${name} ${city} ${state}`);
+        terms.push(`${city} ${state} ${name}`);
+    }
+    
+    if (city && country) {
+        terms.push(`${name} ${city} ${country}`);
+        terms.push(`${city} ${country} ${name}`);
+    }
+    
+    if (state && country) {
+        terms.push(`${name} ${state} ${country}`);
+    }
+    
+    if (county && state) {
+        terms.push(`${name} ${county} ${state}`);
+        terms.push(`${county} ${state} ${name}`);
+    }
+    
+    if (type === 'city' || type === 'town') {
+        terms.push(`${name} ${state} ${country} city`);
+        terms.push(`${name} tourism ${state}`);
+        terms.push(`${name} downtown ${city}`);
+    } else if (type === 'airport' || name.includes('Airport') || name.includes('International')) {
+        terms.push(`${name} airport ${city} ${state}`);
+        terms.push(`${city} ${state} airport terminal`);
+        terms.push(`${name} aerial view ${city}`);
+    } else if (type === 'street' || type === 'road' || osm_key === 'highway') {
+        terms.push(`${name} ${city} ${state} road`);
+        terms.push(`${city} ${state} ${name} street`);
+        terms.push(`${name} scenic drive ${state}`);
+        terms.push(`${name} ${county} ${state} highway`);
+    } else if (type === 'building') {
+        terms.push(`${name} ${city} building architecture`);
+        terms.push(`${city} ${state} ${name} landmark`);
+    } else {
+        terms.push(`${name} ${city} ${state} landmark`);
+        terms.push(`${name} ${county} ${state} tourism`);
+    }
+    
+    if (state) {
+        terms.push(`${name} ${state}`);
+    }
+    
+    if (country) {
+        terms.push(`${name} ${country}`);
     }
     
     terms.push(`${name} landmark`);
-    terms.push(`${name} building`);
-    terms.push(`${name} architecture`);
-    
-    terms.push(name);
+    terms.push(`${name} tourism`);
+    terms.push(`${name} ${type || 'location'}`);
     
     return terms;
 }
@@ -1587,103 +1704,6 @@ async function getNotableFeatureFromOSM(lat, lng) {
         };
     }
 
-    async function calculateRealRoutes(start, end) {
-        const routes = [];
-        const directDistance = map.distance(start, end);
-        
-        const [trafficData, weatherData, ferryData] = await Promise.all([
-            getRealTrafficEstimate(start, end),
-            getRealWeatherAtLocation(start[0], start[1]),
-            getFerryRoutes(start, end)
-        ]);
-        
-        try {
-            const drivingResponse = await fetch(
-                `https://router.project-osrm.org/route/v1/driving/${start[1]},${start[0]};${end[1]},${end[0]}?overview=full&geometries=geojson&steps=true`
-            );
-            const drivingData = await drivingResponse.json();
-            
-            if (drivingData.routes?.[0]) {
-                const baseDuration = drivingData.routes[0].duration;
-                const adjustedDuration = trafficData.duration || baseDuration * 1.2;
-                
-                routes.push({
-                    id: 'driving',
-                    icon: 'lucide:car',
-                    label: 'Driving',
-                    duration: adjustedDuration,
-                    distance: drivingData.routes[0].distance,
-                    geometry: drivingData.routes[0].geometry,
-                    steps: processOSRMSteps(drivingData.routes[0].legs?.[0]?.steps || []),
-                    traffic: trafficData.trafficLevel,
-                    weather: weatherData?.conditions,
-                    realData: true
-                });
-            }
-        } catch (error) {}
-        
-        try {
-            const cyclingTime = await getElevationAdjustedTime(start, end, 'cycling');
-            
-            routes.push({
-                id: 'cycling',
-                icon: 'lucide:bike',
-                label: 'Cycling',
-                duration: cyclingTime,
-                distance: directDistance,
-                geometry: createStraightPath(start, end),
-                steps: [],
-                elevationAdjusted: true,
-                realData: true
-            });
-        } catch (error) {}
-        
-        try {
-            const walkingTime = await getElevationAdjustedTime(start, end, 'walking');
-            
-            routes.push({
-                id: 'walking',
-                icon: 'lucide:footprints',
-                label: 'Walking',
-                duration: walkingTime,
-                distance: directDistance,
-                geometry: createStraightPath(start, end),
-                steps: [],
-                elevationAdjusted: true,
-                realData: true
-            });
-        } catch (error) {}
-        
-        if (ferryData.hasFerry && directDistance > 10000 && directDistance < 500000) {
-            routes.push({
-                id: 'ferry',
-                icon: 'lucide:ship',
-                label: 'Ferry',
-                duration: ferryData.duration,
-                distance: ferryData.distance,
-                geometry: createStraightPath(start, end),
-                steps: [{
-                    distance: ferryData.distance,
-                    duration: ferryData.duration,
-                    maneuver: {
-                        instruction: `Take ferry from ${ferryData.terminals.start} to ${ferryData.terminals.end}`,
-                        type: 'ferry'
-                    }
-                }],
-                realData: true
-            });
-        }
-        
-        if (directDistance > 300000) {
-            const flightRoute = await calculateSmartFlightRoute(start, end, directDistance);
-            if (flightRoute) {
-                routes.push(flightRoute);
-            }
-        }
-        
-        return routes;
-    }
-
     async function calculateSmartFlightRoute(start, end, distance) {
         try {
             const airports = await getAllAirports();
@@ -1764,70 +1784,122 @@ async function getNotableFeatureFromOSM(lat, lng) {
         }
     }
 
-    async function calculateRoutes(start, end) {
+async function calculateRoutes(start, end) {
     const container = document.getElementById('route-options');
     container.innerHTML = '<div class="text-xs text-neutral-500 p-4 text-center">Calculating routes...</div>';
     
-    const distance = map.distance(start, end);
     const routes = [];
     
-    const trafficLevel = calculateTrafficLevel(start, end);
-
-    if (shouldShowFlightRoute(start, end, distance)) {
-        const flightRoute = await calculateFlightRoute(start, end, distance);
+    const [trafficData, weatherData] = await Promise.all([
+        getRealTrafficEstimate(start, end),
+        getRealWeatherAtLocation(start[0], start[1])
+    ]);
+    
+    const directDistance = map.distance(start, end);
+    
+    if (shouldShowFlightRoute(start, end, directDistance)) {
+        const flightRoute = await calculateFlightRoute(start, end, directDistance);
         if (flightRoute) {
             routes.push(flightRoute);
         }
     }
-
-    const modes = [
-        { id: 'driving', icon: 'lucide:car', label: 'Driving' },
-        { id: 'cycling', icon: 'lucide:bike', label: 'Cycling' },
-        { id: 'walking', icon: 'lucide:footprints', label: 'Walking' }
-    ];
     
-    for (const m of modes) {
-        try {
-            const r = await fetch(`https://router.project-osrm.org/route/v1/${m.id}/${start[1]},${start[0]};${end[1]},${end[0]}?overview=full&geometries=geojson&steps=true&annotations=true`)
-                .then(res => res.json());
-            
-            if (r.routes?.[0]) {
-                const route = {
-                    id: m.id,
-                    icon: m.icon,
-                    label: m.label,
-                    duration: r.routes[0].duration,
-                    distance: r.routes[0].distance,
-                    geometry: r.routes[0].geometry,
-                    legs: r.routes[0].legs,
-                    steps: processOSRMSteps(r.routes[0].legs?.[0]?.steps || []),
-                    fullRouteData: r.routes[0]
-                };
-                
-                if (m.id === 'driving') {
-                    route.traffic = trafficLevel;
-                    route.originalDuration = r.routes[0].duration;
-                    if (trafficLevel === 'high') {
-                        route.duration = route.duration * 1.4;
-                    } else if (trafficLevel === 'medium') {
-                        route.duration = route.duration * 1.2;
-                    }
+    try {
+        const drivingResponse = await fetch(`https://router.project-osrm.org/route/v1/driving/${start[1]},${start[0]};${end[1]},${end[0]}?overview=full&geometries=geojson&steps=true`)
+            .then(res => {
+                if (!res.ok) {
+                    return null;
                 }
-                
-                routes.push(route);
+                return res.json();
+            });
+        
+        if (drivingResponse?.routes?.[0] && !drivingResponse.message && drivingResponse.code !== "NoRoute") {
+            const route = drivingResponse.routes[0];
+            const distance = route.distance;
+            let duration = route.duration;
+            
+            if (trafficData.duration) {
+                duration = trafficData.duration;
+            } else {
+                const trafficLevel = trafficData.trafficLevel;
+                if (trafficLevel === 'high') duration = duration * 1.4;
+                else if (trafficLevel === 'medium') duration = duration * 1.2;
             }
-        } catch(e) {
-            console.error(`Route calculation failed for ${m.id}:`, e);
+            
+            const googleDrivingFactor = 0.66;
+            const googleDuration = duration * googleDrivingFactor;
+            
             routes.push({
-                id: m.id,
-                icon: m.icon,
-                label: m.label,
-                duration: (distance / (m.id === 'cycling' ? 15000 : 5000)) * 3600,
+                id: 'driving',
+                icon: 'lucide:car',
+                label: 'Driving',
+                duration: googleDuration,
                 distance: distance,
-                geometry: createStraightPath(start, end),
-                steps: []
+                geometry: route.geometry,
+                steps: processOSRMSteps(route.legs?.[0]?.steps || []),
+                traffic: trafficData.trafficLevel,
+                weather: weatherData?.conditions,
+                realData: true
+            });
+            
+            const routeDistance = distance;
+            const routeGeometry = route.geometry;
+            const drivingSteps = route.legs?.[0]?.steps || [];
+            
+            const walkingTime = (routeDistance / 4360) * 3600;
+            const cyclingTime = (routeDistance / 16400) * 3600;
+            
+            const walkingSteps = generateWalkingSteps(drivingSteps, routeDistance, walkingTime);
+            const cyclingSteps = generateCyclingSteps(drivingSteps, routeDistance, cyclingTime);
+            
+            routes.push({
+                id: 'walking',
+                icon: 'lucide:footprints',
+                label: 'Walking',
+                duration: walkingTime,
+                distance: routeDistance,
+                geometry: routeGeometry,
+                steps: walkingSteps,
+                realData: true
+            });
+            
+            routes.push({
+                id: 'cycling',
+                icon: 'lucide:bike',
+                label: 'Cycling',
+                duration: cyclingTime,
+                distance: routeDistance,
+                geometry: routeGeometry,
+                steps: cyclingSteps,
+                realData: true
             });
         }
+    } catch(e) {
+        console.error('Driving route failed:', e);
+    }
+    
+    const ferryData = await getFerryRoutes(start, end);
+    if (ferryData.hasFerry && directDistance > 10000 && directDistance < 500000) {
+        const ferrySpeed = 40000;
+        const ferryTime = (ferryData.distance / ferrySpeed) * 3600;
+        
+        routes.push({
+            id: 'ferry',
+            icon: 'lucide:ship',
+            label: 'Ferry',
+            duration: ferryTime,
+            distance: ferryData.distance,
+            geometry: createStraightPath(start, end),
+            steps: [{
+                distance: ferryData.distance,
+                duration: ferryTime,
+                maneuver: {
+                    instruction: `Take ferry from ${ferryData.terminals.start} to ${ferryData.terminals.end}`,
+                    type: 'ferry'
+                }
+            }],
+            realData: true
+        });
     }
     
     container.innerHTML = '';
@@ -1840,7 +1912,241 @@ async function getNotableFeatureFromOSM(lat, lng) {
         addRouteCard(route);
     });
 }
+
+function generateWalkingSteps(drivingSteps, totalDistance, totalTime) {
+    if (!drivingSteps || drivingSteps.length === 0) {
+        return [{
+            distance: totalDistance,
+            duration: totalTime,
+            maneuver: {
+                instruction: "Walk to destination",
+                type: "arrive"
+            }
+        }];
+    }
     
+    const walkingSteps = [];
+    let accumulatedDistance = 0;
+    let accumulatedTime = 0;
+    
+    drivingSteps.forEach((step, index) => {
+        const stepDistance = step.distance || 0;
+        const stepProportion = stepDistance / totalDistance;
+        const stepTime = totalTime * stepProportion;
+        
+        const walkingInstruction = convertToWalkingInstruction(step);
+        
+        walkingSteps.push({
+            distance: stepDistance,
+            duration: stepTime,
+            geometry: step.geometry,
+            maneuver: {
+                instruction: walkingInstruction,
+                type: step.maneuver?.type || "continue",
+                modifier: step.maneuver?.modifier || ""
+            },
+            name: step.name,
+            way_points: step.way_points
+        });
+        
+        accumulatedDistance += stepDistance;
+        accumulatedTime += stepTime;
+    });
+    
+    if (Math.abs(accumulatedDistance - totalDistance) > 100) {
+        const lastStep = walkingSteps[walkingSteps.length - 1];
+        lastStep.distance = lastStep.distance + (totalDistance - accumulatedDistance);
+        lastStep.duration = lastStep.duration + (totalTime - accumulatedTime);
+    }
+    
+    walkingSteps.push({
+        distance: 0,
+        duration: 0,
+        maneuver: {
+            instruction: "Arrive at destination",
+            type: "arrive"
+        }
+    });
+    
+    return walkingSteps;
+}
+
+function generateCyclingSteps(drivingSteps, totalDistance, totalTime) {
+    if (!drivingSteps || drivingSteps.length === 0) {
+        return [{
+            distance: totalDistance,
+            duration: totalTime,
+            maneuver: {
+                instruction: "Cycle to destination",
+                type: "arrive"
+            }
+        }];
+    }
+    
+    const cyclingSteps = [];
+    let accumulatedDistance = 0;
+    let accumulatedTime = 0;
+    
+    drivingSteps.forEach((step, index) => {
+        const stepDistance = step.distance || 0;
+        const stepProportion = stepDistance / totalDistance;
+        const stepTime = totalTime * stepProportion;
+        
+        const cyclingInstruction = convertToCyclingInstruction(step);
+        
+        cyclingSteps.push({
+            distance: stepDistance,
+            duration: stepTime,
+            geometry: step.geometry,
+            maneuver: {
+                instruction: cyclingInstruction,
+                type: step.maneuver?.type || "continue",
+                modifier: step.maneuver?.modifier || ""
+            },
+            name: step.name,
+            way_points: step.way_points
+        });
+        
+        accumulatedDistance += stepDistance;
+        accumulatedTime += stepTime;
+    });
+    
+    if (Math.abs(accumulatedDistance - totalDistance) > 100) {
+        const lastStep = cyclingSteps[cyclingSteps.length - 1];
+        lastStep.distance = lastStep.distance + (totalDistance - accumulatedDistance);
+        lastStep.duration = lastStep.duration + (totalTime - accumulatedTime);
+    }
+    
+    cyclingSteps.push({
+        distance: 0,
+        duration: 0,
+        maneuver: {
+            instruction: "Arrive at destination",
+            type: "arrive"
+        }
+    });
+    
+    return cyclingSteps;
+}
+
+function convertToWalkingInstruction(step) {
+    const maneuver = step.maneuver;
+    if (!maneuver) return "Continue walking";
+    
+    const streetName = step.name || "";
+    const baseInstruction = maneuver.instruction || "";
+    
+    switch(maneuver.type) {
+        case 'depart':
+            return streetName ? `Start walking toward ${streetName}` : "Start walking";
+        case 'turn':
+            if (maneuver.modifier === 'left') {
+                return streetName ? `Turn left onto ${streetName}` : "Turn left";
+            } else if (maneuver.modifier === 'right') {
+                return streetName ? `Turn right onto ${streetName}` : "Turn right";
+            } else if (maneuver.modifier === 'sharp left') {
+                return streetName ? `Take sharp left onto ${streetName}` : "Take sharp left";
+            } else if (maneuver.modifier === 'sharp right') {
+                return streetName ? `Take sharp right onto ${streetName}` : "Take sharp right";
+            } else if (maneuver.modifier === 'slight left') {
+                return streetName ? `Bear left onto ${streetName}` : "Bear left";
+            } else if (maneuver.modifier === 'slight right') {
+                return streetName ? `Bear right onto ${streetName}` : "Bear right";
+            } else if (maneuver.modifier === 'uturn') {
+                return "Make a U-turn";
+            }
+            return streetName ? `Turn onto ${streetName}` : "Turn";
+        case 'continue':
+            return streetName ? `Continue on ${streetName}` : "Continue straight";
+        case 'roundabout':
+            const exitNumber = maneuver.exit || 1;
+            const ordinal = getOrdinal(exitNumber);
+            return streetName ? `Take ${ordinal} exit onto ${streetName}` : `Take ${ordinal} exit`;
+        case 'merge':
+            return streetName ? `Merge onto ${streetName}` : "Merge";
+        case 'fork':
+            if (maneuver.modifier === 'left') {
+                return streetName ? `Keep left onto ${streetName}` : "Keep left at fork";
+            } else if (maneuver.modifier === 'right') {
+                return streetName ? `Keep right onto ${streetName}` : "Keep right at fork";
+            }
+            return streetName ? `At fork, continue onto ${streetName}` : "Continue at fork";
+        case 'off ramp':
+            return streetName ? `Take exit for ${streetName}` : "Take exit";
+        case 'on ramp':
+            return streetName ? `Take ramp onto ${streetName}` : "Take ramp";
+        case 'end of road':
+            if (maneuver.modifier === 'left') {
+                return streetName ? `At end of road, turn left onto ${streetName}` : "Turn left at end of road";
+            } else if (maneuver.modifier === 'right') {
+                return streetName ? `At end of road, turn right onto ${streetName}` : "Turn right at end of road";
+            }
+            return streetName ? `At end of road, continue onto ${streetName}` : "Continue at end of road";
+        default:
+            return baseInstruction.replace(/Drive|Car/g, "Walk").replace(/driving/gi, "walking");
+    }
+}
+
+function convertToCyclingInstruction(step) {
+    const maneuver = step.maneuver;
+    if (!maneuver) return "Continue cycling";
+    
+    const streetName = step.name || "";
+    const baseInstruction = maneuver.instruction || "";
+    
+    switch(maneuver.type) {
+        case 'depart':
+            return streetName ? `Start cycling toward ${streetName}` : "Start cycling";
+        case 'turn':
+            if (maneuver.modifier === 'left') {
+                return streetName ? `Turn left onto ${streetName}` : "Turn left";
+            } else if (maneuver.modifier === 'right') {
+                return streetName ? `Turn right onto ${streetName}` : "Turn right";
+            } else if (maneuver.modifier === 'sharp left') {
+                return streetName ? `Take sharp left onto ${streetName}` : "Take sharp left";
+            } else if (maneuver.modifier === 'sharp right') {
+                return streetName ? `Take sharp right onto ${streetName}` : "Take sharp right";
+            } else if (maneuver.modifier === 'slight left') {
+                return streetName ? `Bear left onto ${streetName}` : "Bear left";
+            } else if (maneuver.modifier === 'slight right') {
+                return streetName ? `Bear right onto ${streetName}` : "Bear right";
+            } else if (maneuver.modifier === 'uturn') {
+                return "Make a U-turn";
+            }
+            return streetName ? `Turn onto ${streetName}` : "Turn";
+        case 'continue':
+            return streetName ? `Continue on ${streetName}` : "Continue straight";
+        case 'roundabout':
+            const exitNumber = maneuver.exit || 1;
+            const ordinal = getOrdinal(exitNumber);
+            return streetName ? `Take ${ordinal} exit onto ${streetName}` : `Take ${ordinal} exit`;
+        case 'merge':
+            return streetName ? `Merge onto ${streetName}` : "Merge";
+        case 'fork':
+            if (maneuver.modifier === 'left') {
+                return streetName ? `Keep left onto ${streetName}` : "Keep left at fork";
+            } else if (maneuver.modifier === 'right') {
+                return streetName ? `Keep right onto ${streetName}` : "Keep right at fork";
+            }
+            return streetName ? `At fork, continue onto ${streetName}` : "Continue at fork";
+        case 'off ramp':
+            return streetName ? `Take exit for ${streetName}` : "Take exit";
+        case 'on ramp':
+            return streetName ? `Take ramp onto ${streetName}` : "Take ramp";
+        case 'end of road':
+            if (maneuver.modifier === 'left') {
+                return streetName ? `At end of road, turn left onto ${streetName}` : "Turn left at end of road";
+            } else if (maneuver.modifier === 'right') {
+                return streetName ? `At end of road, turn right onto ${streetName}` : "Turn right at end of road";
+            }
+            return streetName ? `At end of road, continue onto ${streetName}` : "Continue at end of road";
+        case 'arrive':
+            return "Arrive at destination";
+        default:
+            return baseInstruction.replace(/Drive|Car/g, "Cycle").replace(/driving/gi, "cycling");
+    }
+}
+ 
     function initMap() {
         map = L.map('map', { 
             zoomControl: false, 
@@ -4817,44 +5123,98 @@ function startActiveNav(route) {
     }
 
     function displaySearchResults(results) {
-       
-        const container = document.getElementById('results');
-        container.innerHTML = '';
+    const container = document.getElementById('results');
+    container.innerHTML = '';
+    
+    if (results.length === 0) {
+        container.innerHTML = '<div class="text-xs text-neutral-500 p-4 text-center">No results found</div>';
+        container.classList.remove('hidden');
+        return;
+    }
+    
+    results.forEach((result) => {
+        const div = document.createElement('div');
+        div.className = 'search-result';
         
-        if (results.length === 0) {
-            container.innerHTML = '<div class="text-xs text-neutral-500 p-4 text-center">No results found</div>';
-            container.classList.remove('hidden');
-            return;
+        const props = result.properties;
+        const name = props.name || props.street || props.city || "Location";
+        
+        const addressParts = [];
+        
+        if (props.housenumber && props.street) {
+            addressParts.push(`${props.housenumber} ${props.street}`);
+        } else if (props.street) {
+            addressParts.push(props.street);
         }
         
-        results.forEach((result) => {
-            const div = document.createElement('div');
-            div.className = 'search-result';
-            
-            const props = result.properties;
-            const name = props.name || props.street || props.city || "Unnamed Location";
-            const details = [props.housenumber, props.street, props.city, props.country]
-                .filter(Boolean)
-                .join(', ');
-            
-            div.innerHTML = `
-                <div class="text-[11px] font-bold text-white mb-1">${name}</div>
-                <div class="text-[9px] text-neutral-400">${details || 'Coordinates'}</div>
-            `;
-            
-            div.onclick = () => {
-                const [lng, lat] = result.geometry.coordinates;
-                map.flyTo([lat, lng], 15, { animate: true, duration: 1 });
-                triggerAnalysis(lat, lng);
-                hideSearchResults();
-                document.getElementById('search-input').value = name;
-            };
-            
-            container.appendChild(div);
-        });
+        if (props.city) addressParts.push(props.city);
+        if (props.county) addressParts.push(props.county);
+        if (props.state) addressParts.push(props.state);
+        if (props.country) addressParts.push(props.country);
+        if (props.postcode) addressParts.push(props.postcode);
         
-        container.classList.remove('hidden');
-    }
+        const address = addressParts.length > 0 ? addressParts.join(', ') : 'Coordinates';
+        
+        let typeBadge = '';
+        if (props.type) {
+            const typeClass = {
+                'city': 'type-city',
+                'street': 'type-street',
+                'building': 'type-building',
+                'landmark': 'type-landmark'
+            }[props.type] || 'type-default';
+            
+            const typeLabel = {
+                'city': 'City',
+                'street': 'Street',
+                'building': 'Building',
+                'landmark': 'Landmark',
+                'county': 'County',
+                'state': 'State',
+                'country': 'Country'
+            }[props.type] || props.type || 'Location';
+            
+            typeBadge = `<span class="type-badge ${typeClass}">${typeLabel}</span>`;
+        }
+        
+        const osmType = props.osm_type;
+        if (osmType && !props.type) {
+            const osmTypeClass = {
+                'N': 'type-landmark',
+                'W': 'type-street',
+                'R': 'type-city'
+            }[osmType] || 'type-default';
+            
+            const osmTypeLabel = {
+                'N': 'Node',
+                'W': 'Way',
+                'R': 'Relation'
+            }[osmType] || 'OSM';
+            
+            typeBadge = `<span class="type-badge ${osmTypeClass}">${osmTypeLabel}</span>`;
+        }
+        
+        div.innerHTML = `
+            <div class="flex items-start gap-2 mb-1">
+                ${typeBadge}
+                <div class="text-[11px] font-bold text-white truncate flex-1">${name}</div>
+            </div>
+            <div class="text-[9px] text-neutral-400 leading-tight">${address}</div>
+        `;
+        
+        div.onclick = () => {
+            const [lng, lat] = result.geometry.coordinates;
+            map.flyTo([lat, lng], 15, { animate: true, duration: 1 });
+            triggerAnalysis(lat, lng);
+            hideSearchResults();
+            document.getElementById('search-input').value = name;
+        };
+        
+        container.appendChild(div);
+    });
+    
+    container.classList.remove('hidden');
+}
     
     function hideSearchResults() {
         document.getElementById('results').classList.add('hidden');
