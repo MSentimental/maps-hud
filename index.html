@@ -1246,6 +1246,56 @@ async function getRealTimeTraffic(start, end) {
         return { hasFerry: false };
     }
 
+function generateWikipediaSearchTitles(name, addressDetails) {
+    const titles = [];
+    const { city, country, street, housenumber, county, state } = addressDetails;
+    
+    titles.push(name);
+    
+    if (city && city !== name) {
+        titles.push(`${name} ${city}`);
+        titles.push(`${city} ${name}`);
+    }
+    
+    if (city && isGenericLocationName(name, addressDetails)) {
+        titles.push(city);
+    }
+
+    if (street && housenumber && !isGenericLocationName(name, addressDetails)) {
+        titles.push(`${name} ${city} ${country}`);
+    }
+    
+    if (name.includes('Airport') || name.includes('International') || 
+        name.includes('Museum') || name.includes('University')) {
+        if (city) titles.push(`${name} ${city}`);
+        if (city && country) titles.push(`${name} ${city} ${country}`);
+    }
+    
+    if (city && country) {
+        titles.push(`${city}, ${country}`);
+        titles.push(city);
+    }
+    
+    if (street && city) {
+        if (housenumber) {
+            titles.push(`${housenumber} ${street}, ${city}`);
+        }
+        titles.push(`${street}, ${city}`);
+    }
+    
+    if (state && country === 'USA') {
+        titles.push(`${name}, ${state}`);
+        if (city) titles.push(`${city}, ${state}`);
+    }
+    
+    const uniqueTitles = [...new Set(titles.filter(title => 
+        title && title.trim().length > 0 && title !== 'undefined'
+    ))];
+    
+    console.log("Wikipedia search titles:", uniqueTitles);
+    return uniqueTitles;
+}
+
 async function getLocationImages(lat, lng, name, addressDetails = {}) {
     const isGenericStreet = isGenericLocationName(name, addressDetails);
     
@@ -1258,30 +1308,47 @@ async function getLocationImages(lat, lng, name, addressDetails = {}) {
         };
     }
     
-    try {
-        const wikiResponse = await fetch(
-            `https://en.wikipedia.org/w/api.php?action=query&format=json&prop=pageimages|extracts|coordinates&titles=${encodeURIComponent(name)}&exintro=1&explaintext=1&pithumbsize=400&colimit=1&origin=*`
-        );
-        const wikiData = await wikiResponse.json();
-        
-        const pages = wikiData.query?.pages;
-        if (pages) {
-            const page = Object.values(pages)[0];
+    const wikipediaSearchTitles = generateWikipediaSearchTitles(name, addressDetails);
+    
+    for (const searchTitle of wikipediaSearchTitles) {
+        try {
+            const wikiResponse = await fetch(
+                `https://en.wikipedia.org/w/api.php?action=query&format=json&prop=pageimages|extracts|coordinates&titles=${encodeURIComponent(searchTitle)}&exintro=1&explaintext=1&pithumbsize=400&colimit=1&origin=*`
+            );
+            const wikiData = await wikiResponse.json();
             
-            if (isNotableWikipediaPage(page)) {
-                if (page.thumbnail?.source) {
-                    return {
-                        image: page.thumbnail.source,
-                        description: page.extract || '',
-                        wikipediaUrl: `https://en.wikipedia.org/wiki/${encodeURIComponent(page.title)}`,
-                        source: 'Wikipedia',
-                        relevance: 'high'
-                    };
+            const pages = wikiData.query?.pages;
+            if (pages) {
+                const page = Object.values(pages)[0];
+                
+                if (page.pageid && !page.missing && !page.title.includes('(disambiguation)')) {
+                    if (isNotableWikipediaPage(page)) {
+                        if (page.thumbnail?.source) {
+                            return {
+                                image: page.thumbnail.source,
+                                description: page.extract || '',
+                                wikipediaUrl: `https://en.wikipedia.org/wiki/${encodeURIComponent(page.title)}`,
+                                source: 'Wikipedia',
+                                relevance: 'high',
+                                matchedTitle: searchTitle
+                            };
+                        } else if (page.extract && page.extract.length > 100) {
+                            return {
+                                image: null,
+                                description: page.extract.substring(0, 300) + '...',
+                                wikipediaUrl: `https://en.wikipedia.org/wiki/${encodeURIComponent(page.title)}`,
+                                source: 'Wikipedia',
+                                relevance: 'medium',
+                                matchedTitle: searchTitle
+                            };
+                        }
+                    }
                 }
             }
+        } catch (error) {
+            console.error("Wikipedia error for title:", searchTitle, error);
+            continue;
         }
-    } catch (error) {
-        console.error("Wikipedia error:", error);
     }
     
     try {
