@@ -1,4 +1,4 @@
-<!-- Compiled in Cursor | Last build update: 2/11/2026  2:16:17 PM | Version No. 6 -->
+<!-- Compiled in Cursor | Last build update: 2/11/2026  2:48:15 PM | Version No. 7 -->
 <!DOCTYPE html>
 <html lang="en">
     <head>
@@ -1543,7 +1543,7 @@
 
                     <div id="loader">
                         <svg viewBox="0 0 76 65" fill="white" class="w-12 h-12 mb-4 animate-pulse"><path d="M37.5274 0L75.0548 65H0L37.5274 0Z"></path></svg>
-                        <div class="text-[9px] font-bold text-neutral-500 uppercase tracking-[0.5em]">Strike Maps [V6] | Built by msentimental</div>
+                        <div class="text-[9px] font-bold text-neutral-500 uppercase tracking-[0.5em]">Strike Maps [V7] | Built by msentimental</div>
                         <div class="loading-bar"><div class="loading-fill"></div></div>
                     </div>
 
@@ -1673,7 +1673,7 @@
 
                     <div class="absolute bottom-6 right-6 z-[1000] flex flex-col gap-3 ui-animate">
                         <div class="strike-glass p-1 flex flex-col gap-1 mt-2">
-                            <button id="copy-dest-btn" class="w-10 h-10 flex items-center justify-center rounded-xl text-neutral-400 hover:text-white transition-all" title="Copy destination link">
+                            <button id="copy-dest-btn" class="w-10 h-10 flex items-center justify-center rounded-xl text-neutral-400 hover:text-white transition-all" title="Copy last viewed destination link">
                             <iconify-icon icon="lucide:link-2" class="text-lg"></iconify-icon>
                             </button>
                         </div>
@@ -1702,7 +1702,7 @@
                             <path d="M37.5274 0L75.0548 65H0L37.5274 0Z"></path>
                             </svg>
 
-                            <span>Strike Maps [V6]</span>
+                            <span>Strike Maps [V7]</span>
 
                             <span class="opacity-60">•</span>
 
@@ -2561,9 +2561,9 @@ return images;
 
 function generateGlobalSearchTerms(name, addressDetails) {
     const terms = [];
-    const city = addressDetails.city || '';
-    const region = addressDetails.state || addressDetails.region || addressDetails.county || '';
-    const country = addressDetails.country || '';
+    const city = (addressDetails && addressDetails.city) || '';
+    const region = (addressDetails && (addressDetails.state || addressDetails.region || addressDetails.county)) || '';
+    const country = (addressDetails && addressDetails.country) || '';
 
     const cleanName = name
     .replace(/\b(city|town|village|borough|municipality|commune|город|市|stadt)\b/gi, '')
@@ -2642,9 +2642,9 @@ function generateGlobalSearchTerms(name, addressDetails) {
 function isImageRelevantGlobally(page, imageInfo, expectedName, addressDetails, lat, lng) {
     const title = page.title.toLowerCase();
     const expectedNameLower = expectedName.toLowerCase();
-    const city = (addressDetails.city || '').toLowerCase();
-    const region = (addressDetails.state || addressDetails.region || addressDetails.county || '').toLowerCase();
-    const country = (addressDetails.country || '').toLowerCase();
+    const city = (addressDetails && addressDetails.city) || '';
+    const region = (addressDetails && (addressDetails.state || addressDetails.region || addressDetails.county)) || '';
+    const country = (addressDetails && addressDetails.country) || '';
 
     if (title.includes('.svg') || title.includes('.pdf') || title.includes('.djvu')) {
         return false;
@@ -2779,9 +2779,9 @@ function calculateGlobalRelevanceScore(page, imageInfo, name, addressDetails) {
     const title = page.title.toLowerCase();
     const metadata = imageInfo.extmetadata || {};
     const description = (metadata.ImageDescription?.value || '').toLowerCase();
-    const city = (addressDetails.city || '').toLowerCase();
-    const region = (addressDetails.state || addressDetails.region || addressDetails.county || '').toLowerCase();
-    const country = (addressDetails.country || '').toLowerCase();
+    const city = (addressDetails && addressDetails.city) || '';
+    const region = (addressDetails && (addressDetails.state || addressDetails.region || addressDetails.county)) || '';
+    const country = (addressDetails && addressDetails.country) || '';
 
     if (country) {
         const countryVariations = getCountryNameVariations(country);
@@ -3230,9 +3230,9 @@ return images;
 
 function generateGlobalWikipediaTerms(name, addressDetails) {
     const terms = [];
-    const city = addressDetails.city || '';
-    const region = addressDetails.state || addressDetails.region || addressDetails.county || '';
-    const country = addressDetails.country || '';
+    const city = (addressDetails && addressDetails.city) || '';
+    const region = (addressDetails && (addressDetails.state || addressDetails.region || addressDetails.county)) || '';
+    const country = (addressDetails && addressDetails.country) || '';
 
     const cleanName = name
     .replace(/\b(city|town|village|borough|commune|stadt|市|город)\b/gi, '')
@@ -3289,7 +3289,7 @@ function isWikipediaPageRelevantGlobally(page, expectedName, addressDetails) {
     const title = page.title.toLowerCase();
     const extract = (page.extract || '').toLowerCase();
     const expectedNameLower = expectedName.toLowerCase();
-    const country = (addressDetails.country || '').toLowerCase();
+    const country = (addressDetails && addressDetails.country) || '';
 
     if (country) {
         const countryVariations = getCountryNameVariations(country);
@@ -5090,17 +5090,15 @@ function generateShareURL() {
 }
 
 function generateDestinationURL() {
-    if (!selectedTarget) {
-        showToast(`No destination selected`, 3000);
+    if (!lastViewedDestination) {
+        showToast(`No destination viewed yet`, 3000);
         return;
     }
     
-    const dest = selectedTarget;
+    const dest = lastViewedDestination;
     const mapType = map.hasLayer(satLayer) ? 'satellite' : 'osm';
-    
-    const url = new URL(window.location.href);
-    url.searchParams.set('destination', `${dest[0].toFixed(6)},${dest[1].toFixed(6)}`);
-    url.searchParams.set('type', mapType);
+    const baseUrl = window.location.origin + window.location.pathname;
+    const url = `${baseUrl}?destination=${dest[0].toFixed(6)},${dest[1].toFixed(6)}&type=${mapType}`;
     
     navigator.clipboard.writeText(url.toString()).then(() => {
         showToast(`Destination link copied to clipboard`, 3000);
@@ -5611,7 +5609,13 @@ setTimeout(() => {
         (pos) => {
             userPos = [pos.coords.latitude, pos.coords.longitude];
             userMarker.setLatLng(userPos);
-            map.setView(userPos, 14);
+            const urlParams = new URLSearchParams(window.location.search);
+            const hasShareParam = urlParams.has('share');
+            const hasDestinationParam = urlParams.has('destination');
+            
+            if (!hasShareParam && !hasDestinationParam) {
+                map.setView(userPos, 14);
+            }
 
             document.getElementById('hud-precision').innerText = `${pos.coords.accuracy.toFixed(0)}m`;
             document.getElementById('status-text').innerText = "Located";
@@ -5713,12 +5717,15 @@ function stripAllHTML(input = '') {
     .trim();
 }
 
+let lastViewedDestination = null;
+
 async function triggerAnalysis(lat, lng) {
     if (destinationMarker && map.hasLayer(destinationMarker)) {
         map.removeLayer(destinationMarker);
     }
 
     selectedTarget = [lat, lng];
+    lastViewedDestination = [lat, lng];
     const sidebar = document.getElementById('info-sidebar');
     sidebar.classList.add('active');
     routeLayer.clearLayers();
@@ -5903,6 +5910,9 @@ document.getElementById('sidebar-content').innerHTML = `
     </div>
 </div>
 `;
+
+document.getElementById('sidebar-share-btn').classList.remove('hidden');
+document.getElementById('sidebar-share-btn').style.display = 'flex';
 }
 } catch (error) {
 console.error("Analysis failed:", error);
@@ -6954,6 +6964,253 @@ function getCommercialAirports() {
         { code: "DZA", name: "Dzaoudzi Pamandzi International Airport", city: "Dzaoudzi", country: "Mayotte", coordinates: [-12.8047, 45.2811], size: "medium" },
         { code: "SEZ", name: "Seychelles International Airport", city: "Victoria", country: "Seychelles", coordinates: [-4.6743, 55.5218], size: "medium" },
         { code: "MLE", name: "Velana International Airport", city: "Malé", country: "Maldives", coordinates: [4.1918, 73.5291], size: "large" },
+
+{ code: "ULN", name: "Chinggis Khaan International Airport", city: "Ulaanbaatar", country: "Mongolia", coordinates: [47.8431, 106.7664], size: "large" },
+{ code: "UBN", name: "New Ulaanbaatar International Airport", city: "Ulaanbaatar", country: "Mongolia", coordinates: [47.6469, 106.8197], size: "large" },
+{ code: "COQ", name: "Choibalsan Airport", city: "Choibalsan", country: "Mongolia", coordinates: [48.1353, 114.6464], size: "small" },
+{ code: "MXV", name: "Mörön Airport", city: "Mörön", country: "Mongolia", coordinates: [49.6633, 100.0994], size: "small" },
+{ code: "ULZ", name: "Uliastai Airport", city: "Uliastai", country: "Mongolia", coordinates: [47.7125, 96.5258], size: "small" },
+{ code: "HVD", name: "Khovd Airport", city: "Khovd", country: "Mongolia", coordinates: [47.9541, 91.6282], size: "small" },
+{ code: "LTI", name: "Altai Airport", city: "Altai", country: "Mongolia", coordinates: [46.3764, 96.2211], size: "small" },
+{ code: "DLZ", name: "Dalanzadgad Airport", city: "Dalanzadgad", country: "Mongolia", coordinates: [43.5917, 104.4300], size: "small" },
+
+{ code: "ALA", name: "Almaty International Airport", city: "Almaty", country: "Kazakhstan", coordinates: [43.3551, 77.0405], size: "large" },
+{ code: "NQZ", name: "Nursultan Nazarbayev International Airport", city: "Astana", country: "Kazakhstan", coordinates: [51.0222, 71.4669], size: "large" },
+{ code: "CIT", name: "Shymkent International Airport", city: "Shymkent", country: "Kazakhstan", coordinates: [42.3642, 69.4789], size: "medium" },
+{ code: "AKX", name: "Aktobe International Airport", city: "Aktobe", country: "Kazakhstan", coordinates: [50.2458, 57.2067], size: "medium" },
+{ code: "GUW", name: "Atyrau International Airport", city: "Atyrau", country: "Kazakhstan", coordinates: [47.1219, 51.8214], size: "medium" },
+{ code: "KGF", name: "Sary-Arka Airport", city: "Karaganda", country: "Kazakhstan", coordinates: [49.6708, 73.3344], size: "medium" },
+{ code: "URA", name: "Oral Ak Zhol Airport", city: "Oral", country: "Kazakhstan", coordinates: [51.1508, 51.5431], size: "medium" },
+{ code: "PWQ", name: "Pavlodar Airport", city: "Pavlodar", country: "Kazakhstan", coordinates: [52.1950, 77.0739], size: "medium" },
+{ code: "PLX", name: "Semey Airport", city: "Semey", country: "Kazakhstan", coordinates: [50.3513, 80.2344], size: "medium" },
+{ code: "DMB", name: "Taraz Airport", city: "Taraz", country: "Kazakhstan", coordinates: [42.8536, 71.3036], size: "small" },
+{ code: "UKK", name: "Öskemen Airport", city: "Oskemen", country: "Kazakhstan", coordinates: [50.0366, 82.4942], size: "medium" },
+{ code: "KOV", name: "Kokshetau Airport", city: "Kokshetau", country: "Kazakhstan", coordinates: [53.3291, 69.5946], size: "small" },
+{ code: "PPK", name: "Petropavl Airport", city: "Petropavl", country: "Kazakhstan", coordinates: [54.7747, 69.1839], size: "small" },
+{ code: "ZIX", name: "Zhylyoi Airport", city: "Kulsary", country: "Kazakhstan", coordinates: [46.8833, 54.0167], size: "small" },
+
+{ code: "FRU", name: "Manas International Airport", city: "Bishkek", country: "Kyrgyzstan", coordinates: [43.0613, 74.4776], size: "large" },
+{ code: "OSS", name: "Osh Airport", city: "Osh", country: "Kyrgyzstan", coordinates: [40.6090, 72.7933], size: "medium" },
+{ code: "IKU", name: "Issyk-Kul International Airport", city: "Tamchy", country: "Kyrgyzstan", coordinates: [42.5878, 76.7131], size: "small" },
+{ code: "KDJ", name: "Kyrgyzstan Airport", city: "Jalal-Abad", country: "Kyrgyzstan", coordinates: [40.9444, 72.9778], size: "small" },
+
+{ code: "DYU", name: "Dushanbe International Airport", city: "Dushanbe", country: "Tajikistan", coordinates: [38.5433, 68.8250], size: "large" },
+{ code: "LBD", name: "Khujand Airport", city: "Khujand", country: "Tajikistan", coordinates: [40.2154, 69.6947], size: "medium" },
+{ code: "KQT", name: "Qurghonteppa International Airport", city: "Bokhtar", country: "Tajikistan", coordinates: [37.8664, 68.8647], size: "small" },
+{ code: "TJU", name: "Kulob Airport", city: "Kulob", country: "Tajikistan", coordinates: [37.9881, 69.8050], size: "small" },
+
+{ code: "ASB", name: "Ashgabat International Airport", city: "Ashgabat", country: "Turkmenistan", coordinates: [37.9868, 58.3610], size: "large" },
+{ code: "KRW", name: "Turkmenbashi International Airport", city: "Turkmenbashi", country: "Turkmenistan", coordinates: [40.0633, 53.0072], size: "medium" },
+{ code: "MYP", name: "Mary International Airport", city: "Mary", country: "Turkmenistan", coordinates: [37.6194, 61.8967], size: "medium" },
+{ code: "TAZ", name: "Daşoguz Airport", city: "Daşoguz", country: "Turkmenistan", coordinates: [41.7644, 59.8331], size: "small" },
+{ code: "CRZ", name: "Turkmenabat International Airport", city: "Turkmenabat", country: "Turkmenistan", coordinates: [39.0833, 63.6133], size: "medium" },
+
+{ code: "TAS", name: "Islam Karimov Tashkent International Airport", city: "Tashkent", country: "Uzbekistan", coordinates: [41.2579, 69.2812], size: "large" },
+{ code: "SKD", name: "Samarkand International Airport", city: "Samarkand", country: "Uzbekistan", coordinates: [39.7005, 66.9838], size: "medium" },
+{ code: "BHK", name: "Bukhara International Airport", city: "Bukhara", country: "Uzbekistan", coordinates: [39.7750, 64.4833], size: "medium" },
+{ code: "FEG", name: "Fergana International Airport", city: "Fergana", country: "Uzbekistan", coordinates: [40.3588, 71.7450], size: "medium" },
+{ code: "NMA", name: "Namangan Airport", city: "Namangan", country: "Uzbekistan", coordinates: [40.9846, 71.5567], size: "medium" },
+{ code: "UGC", name: "Urgench International Airport", city: "Urgench", country: "Uzbekistan", coordinates: [41.5843, 60.6417], size: "medium" },
+{ code: "KSQ", name: "Karshi Airport", city: "Karshi", country: "Uzbekistan", coordinates: [38.8336, 65.9215], size: "medium" },
+{ code: "TMJ", name: "Termez Airport", city: "Termez", country: "Uzbekistan", coordinates: [37.2867, 67.3100], size: "medium" },
+{ code: "NCU", name: "Nukus Airport", city: "Nukus", country: "Uzbekistan", coordinates: [42.4884, 59.6233], size: "medium" },
+
+{ code: "GYD", name: "Heydar Aliyev International Airport", city: "Baku", country: "Azerbaijan", coordinates: [40.4675, 50.0467], size: "large" },
+{ code: "KVD", name: "Ganja International Airport", city: "Ganja", country: "Azerbaijan", coordinates: [40.7377, 46.3176], size: "medium" },
+{ code: "NAJ", name: "Nakhchivan International Airport", city: "Nakhchivan", country: "Azerbaijan", coordinates: [39.1888, 45.4584], size: "medium" },
+{ code: "GBB", name: "Qabala International Airport", city: "Qabala", country: "Azerbaijan", coordinates: [40.8267, 47.7125], size: "small" },
+{ code: "LLK", name: "Lankaran International Airport", city: "Lankaran", country: "Azerbaijan", coordinates: [38.7464, 48.8180], size: "small" },
+{ code: "ZTU", name: "Zaqatala International Airport", city: "Zaqatala", country: "Azerbaijan", coordinates: [41.5622, 46.6672], size: "small" },
+
+{ code: "EVN", name: "Zvartnots International Airport", city: "Yerevan", country: "Armenia", coordinates: [40.1473, 44.3959], size: "large" },
+{ code: "LWN", name: "Shirak International Airport", city: "Gyumri", country: "Armenia", coordinates: [40.7504, 43.8593], size: "medium" },
+
+{ code: "TBS", name: "Tbilisi International Airport", city: "Tbilisi", country: "Georgia", coordinates: [41.6692, 44.9547], size: "large" },
+{ code: "BUS", name: "Batumi International Airport", city: "Batumi", country: "Georgia", coordinates: [41.6103, 41.5997], size: "medium" },
+{ code: "KUT", name: "David the Builder Kutaisi International Airport", city: "Kutaisi", country: "Georgia", coordinates: [42.1769, 42.4828], size: "medium" },
+{ code: "SUI", name: "Sukhumi Babushara Airport", city: "Sukhumi", country: "Georgia", coordinates: [42.8582, 41.1281], size: "small" },
+
+{ code: "TLL", name: "Lennart Meri Tallinn Airport", city: "Tallinn", country: "Estonia", coordinates: [59.4133, 24.8328], size: "large" },
+{ code: "TAY", name: "Tartu Airport", city: "Tartu", country: "Estonia", coordinates: [58.3075, 26.6904], size: "small" },
+{ code: "URE", name: "Kuressaare Airport", city: "Kuressaare", country: "Estonia", coordinates: [58.2299, 22.5095], size: "small" },
+{ code: "EPU", name: "Pärnu Airport", city: "Pärnu", country: "Estonia", coordinates: [58.4190, 24.4728], size: "small" },
+
+{ code: "RIX", name: "Riga International Airport", city: "Riga", country: "Latvia", coordinates: [56.9236, 23.9711], size: "large" },
+{ code: "VNT", name: "Ventspils International Airport", city: "Ventspils", country: "Latvia", coordinates: [57.3578, 21.5442], size: "small" },
+{ code: "LPX", name: "Liepāja International Airport", city: "Liepāja", country: "Latvia", coordinates: [56.5175, 21.0969], size: "small" },
+
+{ code: "VNO", name: "Vilnius International Airport", city: "Vilnius", country: "Lithuania", coordinates: [54.6341, 25.2858], size: "large" },
+{ code: "KUN", name: "Kaunas International Airport", city: "Kaunas", country: "Lithuania", coordinates: [54.9639, 24.0848], size: "medium" },
+{ code: "PLQ", name: "Palanga International Airport", city: "Palanga", country: "Lithuania", coordinates: [55.9732, 21.0939], size: "medium" },
+{ code: "SQQ", name: "Šiauliai International Airport", city: "Šiauliai", country: "Lithuania", coordinates: [55.8939, 23.3950], size: "small" },
+
+{ code: "PRN", name: "Pristina International Airport", city: "Pristina", country: "Kosovo", coordinates: [42.5728, 21.0358], size: "medium" },
+{ code: "TGD", name: "Podgorica Airport", city: "Podgorica", country: "Montenegro", coordinates: [42.3594, 19.2519], size: "medium" },
+{ code: "TIV", name: "Tivat Airport", city: "Tivat", country: "Montenegro", coordinates: [42.4047, 18.7233], size: "medium" },
+{ code: "OHD", name: "Ohrid St. Paul the Apostle Airport", city: "Ohrid", country: "North Macedonia", coordinates: [41.1800, 20.7423], size: "small" },
+{ code: "SKP", name: "Skopje International Airport", city: "Skopje", country: "North Macedonia", coordinates: [41.9616, 21.6214], size: "medium" },
+{ code: "SJJ", name: "Sarajevo International Airport", city: "Sarajevo", country: "Bosnia and Herzegovina", coordinates: [43.8246, 18.3315], size: "medium" },
+{ code: "BNX", name: "Banja Luka International Airport", city: "Banja Luka", country: "Bosnia and Herzegovina", coordinates: [44.9414, 17.2975], size: "small" },
+{ code: "OMO", name: "Mostar International Airport", city: "Mostar", country: "Bosnia and Herzegovina", coordinates: [43.2829, 17.8459], size: "small" },
+{ code: "TZL", name: "Tuzla International Airport", city: "Tuzla", country: "Bosnia and Herzegovina", coordinates: [44.4587, 18.7248], size: "small" },
+
+{ code: "GYE", name: "José Joaquín de Olmedo International Airport", city: "Guayaquil", country: "Ecuador", coordinates: [-2.1574, -79.8836], size: "large" },
+{ code: "UIO", name: "Mariscal Sucre International Airport", city: "Quito", country: "Ecuador", coordinates: [-0.1411, -78.4882], size: "large" },
+{ code: "CUE", name: "Mariscal Lamar International Airport", city: "Cuenca", country: "Ecuador", coordinates: [-2.8895, -78.9844], size: "medium" },
+{ code: "GPS", name: "Seymour Airport", city: "Galápagos Islands", country: "Ecuador", coordinates: [-0.4538, -90.2659], size: "medium" },
+{ code: "SCY", name: "San Cristóbal Airport", city: "Galápagos Islands", country: "Ecuador", coordinates: [-0.9102, -89.6174], size: "small" },
+
+{ code: "VVI", name: "Viru Viru International Airport", city: "Santa Cruz", country: "Bolivia", coordinates: [-17.6448, -63.1354], size: "large" },
+{ code: "LPB", name: "El Alto International Airport", city: "La Paz", country: "Bolivia", coordinates: [-16.5133, -68.1923], size: "large" },
+{ code: "CBB", name: "Jorge Wilstermann International Airport", city: "Cochabamba", country: "Bolivia", coordinates: [-17.4211, -66.1771], size: "medium" },
+{ code: "TJA", name: "Capitán Oriel Lea Plaza Airport", city: "Tarija", country: "Bolivia", coordinates: [-21.5557, -64.7013], size: "small" },
+{ code: "SRE", name: "Juana Azurduy de Padilla International Airport", city: "Sucre", country: "Bolivia", coordinates: [-19.0071, -65.2887], size: "small" },
+{ code: "POI", name: "Captain Nicolas Rojas Airport", city: "Potosí", country: "Bolivia", coordinates: [-19.5431, -65.7237], size: "small" },
+
+{ code: "ASU", name: "Silvio Pettirossi International Airport", city: "Asunción", country: "Paraguay", coordinates: [-25.2398, -57.5191], size: "large" },
+{ code: "AGT", name: "Guaraní International Airport", city: "Ciudad del Este", country: "Paraguay", coordinates: [-25.4545, -54.8432], size: "medium" },
+
+{ code: "MVD", name: "Carrasco International Airport", city: "Montevideo", country: "Uruguay", coordinates: [-34.8384, -56.0308], size: "large" },
+{ code: "PDP", name: "Capitán de Corbeta Carlos A. Curbelo International Airport", city: "Punta del Este", country: "Uruguay", coordinates: [-34.8551, -55.0943], size: "medium" },
+{ code: "STY", name: "Nueva Hespérides International Airport", city: "Salto", country: "Uruguay", coordinates: [-31.4385, -57.9853], size: "small" },
+
+{ code: "CCS", name: "Simón Bolívar International Airport", city: "Caracas", country: "Venezuela", coordinates: [10.6031, -66.9906], size: "large" },
+{ code: "MAR", name: "La Chinita International Airport", city: "Maracaibo", country: "Venezuela", coordinates: [10.5582, -71.7279], size: "large" },
+{ code: "VLN", name: "Arturo Michelena International Airport", city: "Valencia", country: "Venezuela", coordinates: [10.1497, -67.9284], size: "medium" },
+{ code: "BLA", name: "General José Antonio Anzoátegui International Airport", city: "Barcelona", country: "Venezuela", coordinates: [10.1071, -64.6892], size: "medium" },
+{ code: "PZO", name: "Manuel Carlos Piar Guayana Airport", city: "Ciudad Guayana", country: "Venezuela", coordinates: [8.2885, -62.7604], size: "medium" },
+{ code: "SVZ", name: "San Antonio del Táchira Airport", city: "San Antonio", country: "Venezuela", coordinates: [7.8408, -72.4397], size: "small" },
+
+{ code: "PTY", name: "Tocumen International Airport", city: "Panama City", country: "Panama", coordinates: [9.0714, -79.3835], size: "large" },
+{ code: "PAC", name: "Marcos A. Gelabert International Airport", city: "Panama City", country: "Panama", coordinates: [8.9733, -79.5556], size: "medium" },
+{ code: "DAV", name: "Enrique Malek International Airport", city: "David", country: "Panama", coordinates: [8.3910, -82.4348], size: "medium" },
+
+{ code: "SJO", name: "Juan Santamaría International Airport", city: "San José", country: "Costa Rica", coordinates: [9.9939, -84.2089], size: "large" },
+{ code: "LIR", name: "Daniel Oduber Quirós International Airport", city: "Liberia", country: "Costa Rica", coordinates: [10.5933, -85.5444], size: "large" },
+{ code: "SYQ", name: "Tobías Bolaños International Airport", city: "San José", country: "Costa Rica", coordinates: [9.9571, -84.1398], size: "small" },
+{ code: "PMS", name: "Puerto Jiménez Airport", city: "Puerto Jiménez", country: "Costa Rica", coordinates: [8.5333, -83.3000], size: "small" },
+{ code: "DRK", name: "Drake Bay Airport", city: "Drake Bay", country: "Costa Rica", coordinates: [8.7189, -83.6417], size: "small" },
+
+{ code: "MGA", name: "Augusto C. Sandino International Airport", city: "Managua", country: "Nicaragua", coordinates: [12.1415, -86.1682], size: "large" },
+
+{ code: "SAP", name: "Ramón Villeda Morales International Airport", city: "San Pedro Sula", country: "Honduras", coordinates: [15.4526, -87.9236], size: "large" },
+{ code: "TGU", name: "Toncontín International Airport", city: "Tegucigalpa", country: "Honduras", coordinates: [14.0609, -87.2172], size: "medium" },
+{ code: "RTB", name: "Juan Manuel Gálvez International Airport", city: "Roatán", country: "Honduras", coordinates: [16.3168, -86.5230], size: "medium" },
+{ code: "LCE", name: "Golosón International Airport", city: "La Ceiba", country: "Honduras", coordinates: [15.7425, -86.8530], size: "medium" },
+
+{ code: "BZE", name: "Philip S. W. Goldson International Airport", city: "Belize City", country: "Belize", coordinates: [17.5392, -88.3082], size: "large" },
+{ code: "SPR", name: "San Pedro Airport", city: "San Pedro", country: "Belize", coordinates: [17.9139, -87.9711], size: "small" },
+{ code: "CYD", name: "Caye Caulker Airport", city: "Caye Caulker", country: "Belize", coordinates: [17.7347, -88.0325], size: "small" },
+
+{ code: "GUA", name: "La Aurora International Airport", city: "Guatemala City", country: "Guatemala", coordinates: [14.5833, -90.5275], size: "large" },
+{ code: "FRS", name: "Mundo Maya International Airport", city: "Flores", country: "Guatemala", coordinates: [16.9138, -89.8664], size: "medium" },
+{ code: "AAZ", name: "Quetzaltenango Airport", city: "Quetzaltenango", country: "Guatemala", coordinates: [14.8656, -91.5019], size: "small" },
+
+{ code: "SAL", name: "Monseñor Óscar Arnulfo Romero International Airport", city: "San Salvador", country: "El Salvador", coordinates: [13.4409, -89.0557], size: "large" },
+
+{ code: "BRG", name: "Terrance B. Lettsome International Airport", city: "Road Town", country: "British Virgin Islands", coordinates: [18.4448, -64.5429], size: "small" },
+{ code: "NEV", name: "Vance W. Amory International Airport", city: "Nevis", country: "Saint Kitts and Nevis", coordinates: [17.2058, -62.5899], size: "small" },
+{ code: "MNI", name: "John A. Osborne Airport", city: "Gerald's Park", country: "Montserrat", coordinates: [16.7914, -62.1933], size: "small" },
+{ code: "BBR", name: "Baillif Airport", city: "Basse-Terre", country: "Guadeloupe", coordinates: [16.0133, -61.7422], size: "small" },
+{ code: "SFG", name: "L'Espérance Airport", city: "Grand Case", country: "Saint Martin", coordinates: [18.0999, -63.0472], size: "small" },
+{ code: "GBJ", name: "Les Bases Airport", city: "Grand-Bourg", country: "Guadeloupe", coordinates: [15.8687, -61.2700], size: "small" },
+{ code: "FDF", name: "Martinique Aimé Césaire International Airport", city: "Fort-de-France", country: "Martinique", coordinates: [14.5910, -61.0032], size: "medium" },
+{ code: "PTP", name: "Pointe-à-Pitre International Airport", city: "Pointe-à-Pitre", country: "Guadeloupe", coordinates: [16.2653, -61.5318], size: "medium" },
+{ code: "CAY", name: "Cayenne – Félix Éboué Airport", city: "Cayenne", country: "French Guiana", coordinates: [4.8198, -52.3604], size: "medium" },
+
+{ code: "DLA", name: "Douala International Airport", city: "Douala", country: "Cameroon", coordinates: [4.0061, 9.7195], size: "large" },
+{ code: "NSI", name: "Yaoundé Nsimalen International Airport", city: "Yaoundé", country: "Cameroon", coordinates: [3.7226, 11.5533], size: "large" },
+{ code: "BGF", name: "Bangui M'Poko International Airport", city: "Bangui", country: "Central African Republic", coordinates: [4.3985, 18.5188], size: "medium" },
+{ code: "NDJ", name: "N'Djamena International Airport", city: "N'Djamena", country: "Chad", coordinates: [12.1337, 15.0340], size: "medium" },
+{ code: "COO", name: "Cadjehoun Airport", city: "Cotonou", country: "Benin", coordinates: [6.3572, 2.3844], size: "medium" },
+{ code: "LFW", name: "Lomé–Tokoin International Airport", city: "Lomé", country: "Togo", coordinates: [6.1656, 1.2544], size: "medium" },
+{ code: "OUA", name: "Ouagadougou International Airport", city: "Ouagadougou", country: "Burkina Faso", coordinates: [12.3532, -1.5124], size: "medium" },
+{ code: "BKO", name: "Bamako–Sénou International Airport", city: "Bamako", country: "Mali", coordinates: [12.5335, -7.9499], size: "medium" },
+{ code: "NKC", name: "Nouakchott–Oumtounsy International Airport", city: "Nouakchott", country: "Mauritania", coordinates: [18.3100, -15.9697], size: "medium" },
+{ code: "DSS", name: "Blaise Diagne International Airport", city: "Dakar", country: "Senegal", coordinates: [14.7397, -17.4902], size: "large" },
+{ code: "BJL", name: "Banjul International Airport", city: "Banjul", country: "Gambia", coordinates: [13.3380, -16.6522], size: "medium" },
+{ code: "FNA", name: "Lungi International Airport", city: "Freetown", country: "Sierra Leone", coordinates: [8.6164, -13.1955], size: "medium" },
+{ code: "ROB", name: "Roberts International Airport", city: "Monrovia", country: "Liberia", coordinates: [6.2338, -10.3623], size: "medium" },
+{ code: "ABJ", name: "Félix-Houphouët-Boigny International Airport", city: "Abidjan", country: "Ivory Coast", coordinates: [5.2614, -3.9263], size: "large" },
+{ code: "ACC", name: "Kotoka International Airport", city: "Accra", country: "Ghana", coordinates: [5.6052, -0.1668], size: "large" },
+
+{ code: "NIM", name: "Diori Hamani International Airport", city: "Niamey", country: "Niger", coordinates: [13.4815, 2.1836], size: "medium" },
+{ code: "KAN", name: "Mallam Aminu Kano International Airport", city: "Kano", country: "Nigeria", coordinates: [12.0476, 8.5246], size: "large" },
+{ code: "ABV", name: "Nnamdi Azikiwe International Airport", city: "Abuja", country: "Nigeria", coordinates: [9.0068, 7.2632], size: "large" },
+{ code: "LOS", name: "Murtala Muhammed International Airport", city: "Lagos", country: "Nigeria", coordinates: [6.5774, 3.3212], size: "large" },
+{ code: "PHC", name: "Port Harcourt International Airport", city: "Port Harcourt", country: "Nigeria", coordinates: [5.0151, 6.9496], size: "large" },
+{ code: "ENU", name: "Akanu Ibiam International Airport", city: "Enugu", country: "Nigeria", coordinates: [6.4743, 7.5619], size: "medium" },
+{ code: "KAD", name: "Kaduna International Airport", city: "Kaduna", country: "Nigeria", coordinates: [10.6960, 7.3201], size: "medium" },
+
+{ code: "SSG", name: "Malabo International Airport", city: "Malabo", country: "Equatorial Guinea", coordinates: [3.7550, 8.7087], size: "medium" },
+{ code: "BSG", name: "Bata Airport", city: "Bata", country: "Equatorial Guinea", coordinates: [1.9055, 9.8056], size: "small" },
+{ code: "LBV", name: "Libreville International Airport", city: "Libreville", country: "Gabon", coordinates: [0.4586, 9.4123], size: "large" },
+{ code: "POG", name: "Port Gentil International Airport", city: "Port-Gentil", country: "Gabon", coordinates: [-0.7117, 8.7544], size: "medium" },
+{ code: "BZV", name: "Maya-Maya Airport", city: "Brazzaville", country: "Republic of the Congo", coordinates: [-4.2517, 15.2530], size: "medium" },
+{ code: "FIH", name: "N'djili International Airport", city: "Kinshasa", country: "DR Congo", coordinates: [-4.3858, 15.4446], size: "large" },
+{ code: "FBM", name: "Lubumbashi International Airport", city: "Lubumbashi", country: "DR Congo", coordinates: [-11.5913, 27.5309], size: "medium" },
+{ code: "KGL", name: "Kigali International Airport", city: "Kigali", country: "Rwanda", coordinates: [-1.9686, 30.1395], size: "large" },
+{ code: "BJM", name: "Bujumbura International Airport", city: "Bujumbura", country: "Burundi", coordinates: [-3.3240, 29.3185], size: "medium" },
+{ code: "EBB", name: "Entebbe International Airport", city: "Entebbe", country: "Uganda", coordinates: [0.0424, 32.4435], size: "large" },
+{ code: "JUB", name: "Juba International Airport", city: "Juba", country: "South Sudan", coordinates: [4.8720, 31.6011], size: "medium" },
+
+{ code: "MPM", name: "Maputo International Airport", city: "Maputo", country: "Mozambique", coordinates: [-25.9208, 32.5726], size: "large" },
+{ code: "BEW", name: "Beira Airport", city: "Beira", country: "Mozambique", coordinates: [-19.7964, 34.9076], size: "medium" },
+{ code: "VNX", name: "Vilankulo Airport", city: "Vilankulo", country: "Mozambique", coordinates: [-22.0184, 35.3133], size: "small" },
+{ code: "INH", name: "Inhambane Airport", city: "Inhambane", country: "Mozambique", coordinates: [-23.8764, 35.4085], size: "small" },
+{ code: "WDH", name: "Hosea Kutako International Airport", city: "Windhoek", country: "Namibia", coordinates: [-22.4867, 17.4625], size: "large" },
+{ code: "WVB", name: "Walvis Bay Airport", city: "Walvis Bay", country: "Namibia", coordinates: [-22.9799, 14.6453], size: "medium" },
+{ code: "GBE", name: "Sir Seretse Khama International Airport", city: "Gaborone", country: "Botswana", coordinates: [-24.5552, 25.9182], size: "large" },
+{ code: "BBK", name: "Kasane Airport", city: "Kasane", country: "Botswana", coordinates: [-17.8329, 25.1624], size: "small" },
+{ code: "MUB", name: "Maun Airport", city: "Maun", country: "Botswana", coordinates: [-19.9726, 23.4311], size: "medium" },
+{ code: "HRE", name: "Robert Gabriel Mugabe International Airport", city: "Harare", country: "Zimbabwe", coordinates: [-17.9318, 31.0928], size: "large" },
+{ code: "BUQ", name: "Joshua Mqabuko Nkomo International Airport", city: "Bulawayo", country: "Zimbabwe", coordinates: [-20.0174, 28.6179], size: "medium" },
+{ code: "VFA", name: "Victoria Falls International Airport", city: "Victoria Falls", country: "Zimbabwe", coordinates: [-18.0959, 25.8390], size: "medium" },
+{ code: "LUN", name: "Kenneth Kaunda International Airport", city: "Lusaka", country: "Zambia", coordinates: [-15.3308, 28.4527], size: "large" },
+{ code: "LVI", name: "Harry Mwanga Nkumbula International Airport", city: "Livingstone", country: "Zambia", coordinates: [-17.8218, 25.8227], size: "medium" },
+{ code: "BLZ", name: "Chileka International Airport", city: "Blantyre", country: "Malawi", coordinates: [-15.6791, 34.9740], size: "medium" },
+{ code: "LLW", name: "Lilongwe International Airport", city: "Lilongwe", country: "Malawi", coordinates: [-13.7894, 33.7810], size: "medium" },
+{ code: "TNR", name: "Ivato International Airport", city: "Antananarivo", country: "Madagascar", coordinates: [-18.7969, 47.4788], size: "large" },
+{ code: "NOS", name: "Fascene Airport", city: "Nosy Be", country: "Madagascar", coordinates: [-13.3121, 48.3148], size: "medium" },
+{ code: "DZA", name: "Dzaoudzi Pamandzi International Airport", city: "Dzaoudzi", country: "Mayotte", coordinates: [-12.8047, 45.2811], size: "medium" },
+{ code: "RUN", name: "Roland Garros Airport", city: "Saint-Denis", country: "Réunion", coordinates: [-20.8871, 55.5103], size: "large" },
+{ code: "MRU", name: "Sir Seewoosagur Ramgoolam International Airport", city: "Port Louis", country: "Mauritius", coordinates: [-20.4302, 57.6836], size: "large" },
+{ code: "SEZ", name: "Seychelles International Airport", city: "Victoria", country: "Seychelles", coordinates: [-4.6743, 55.5218], size: "medium" },
+{ code: "PRI", name: "Praslin Island Airport", city: "Praslin", country: "Seychelles", coordinates: [-4.3193, 55.6914], size: "small" },
+{ code: "COM", name: "Mutiara Airport", city: "Maumere", country: "Indonesia", coordinates: [-8.6406, 122.2369], size: "small" },
+
+{ code: "TBS", name: "Tbilisi International Airport", city: "Tbilisi", country: "Georgia", coordinates: [41.6692, 44.9547], size: "large" },
+{ code: "KUT", name: "David the Builder Kutaisi International Airport", city: "Kutaisi", country: "Georgia", coordinates: [42.1769, 42.4828], size: "medium" },
+{ code: "BUS", name: "Batumi International Airport", city: "Batumi", country: "Georgia", coordinates: [41.6103, 41.5997], size: "medium" },
+{ code: "EVN", name: "Zvartnots International Airport", city: "Yerevan", country: "Armenia", coordinates: [40.1473, 44.3959], size: "large" },
+{ code: "LWN", name: "Shirak International Airport", city: "Gyumri", country: "Armenia", coordinates: [40.7504, 43.8593], size: "medium" },
+{ code: "GYD", name: "Heydar Aliyev International Airport", city: "Baku", country: "Azerbaijan", coordinates: [40.4675, 50.0467], size: "large" },
+{ code: "KVD", name: "Ganja International Airport", city: "Ganja", country: "Azerbaijan", coordinates: [40.7377, 46.3176], size: "medium" },
+{ code: "NAJ", name: "Nakhchivan International Airport", city: "Nakhchivan", country: "Azerbaijan", coordinates: [39.1888, 45.4584], size: "medium" },
+
+{ code: "TKK", name: "Chuuk International Airport", city: "Chuuk", country: "Micronesia", coordinates: [7.4619, 151.8430], size: "small" },
+{ code: "PNI", name: "Pohnpei International Airport", city: "Pohnpei", country: "Micronesia", coordinates: [6.9851, 158.2090], size: "small" },
+{ code: "KSA", name: "Kosrae International Airport", city: "Kosrae", country: "Micronesia", coordinates: [5.3570, 162.9580], size: "small" },
+{ code: "YAP", name: "Yap International Airport", city: "Yap", country: "Micronesia", coordinates: [9.4989, 138.0820], size: "small" },
+
+{ code: "POM", name: "Jacksons International Airport", city: "Port Moresby", country: "Papua New Guinea", coordinates: [-9.4438, 147.2203], size: "large" },
+{ code: "LAE", name: "Lae Nadzab Airport", city: "Lae", country: "Papua New Guinea", coordinates: [-6.5698, 146.7262], size: "medium" },
+{ code: "HGU", name: "Mount Hagen Airport", city: "Mount Hagen", country: "Papua New Guinea", coordinates: [-5.8268, 144.2959], size: "medium" },
+{ code: "RAB", name: "Rabaul Airport", city: "Rabaul", country: "Papua New Guinea", coordinates: [-4.3405, 152.3796], size: "small" },
+{ code: "MAG", name: "Madang Airport", city: "Madang", country: "Papua New Guinea", coordinates: [-5.2071, 145.7887], size: "small" },
+{ code: "VLI", name: "Bauerfield International Airport", city: "Port Vila", country: "Vanuatu", coordinates: [-17.6993, 168.3198], size: "medium" },
+{ code: "SON", name: "Santo-Pekoa International Airport", city: "Luganville", country: "Vanuatu", coordinates: [-15.5050, 167.2197], size: "small" },
+{ code: "NOU", name: "La Tontouta International Airport", city: "Nouméa", country: "New Caledonia", coordinates: [-22.0146, 166.2130], size: "medium" },
+{ code: "SUV", name: "Nausori International Airport", city: "Suva", country: "Fiji", coordinates: [-18.0433, 178.5592], size: "medium" },
+{ code: "NAN", name: "Nadi International Airport", city: "Nadi", country: "Fiji", coordinates: [-17.7554, 177.4434], size: "large" },
+{ code: "TBU", name: "Fuaʻamotu International Airport", city: "Nukuʻalofa", country: "Tonga", coordinates: [-21.2412, -175.1494], size: "medium" },
+{ code: "APW", name: "Faleolo International Airport", city: "Apia", country: "Samoa", coordinates: [-13.8300, -172.0083], size: "medium" },
+{ code: "PPT", name: "Faa'a International Airport", city: "Papeete", country: "French Polynesia", coordinates: [-17.5567, -149.6114], size: "large" },
+{ code: "BOB", name: "Bora Bora Airport", city: "Bora Bora", country: "French Polynesia", coordinates: [-16.4444, -151.7514], size: "medium" },
+{ code: "RAR", name: "Rarotonga International Airport", city: "Avarua", country: "Cook Islands", coordinates: [-21.2027, -159.8056], size: "small" },
+{ code: "FUN", name: "Funafuti International Airport", city: "Funafuti", country: "Tuvalu", coordinates: [-8.5250, 179.1964], size: "small" },
+{ code: "TRW", name: "Bonriki International Airport", city: "Tarawa", country: "Kiribati", coordinates: [1.3816, 173.1469], size: "small" },
+{ code: "INU", name: "Nauru International Airport", city: "Yaren", country: "Nauru", coordinates: [-0.5477, 166.9194], size: "small" }
     ];
 }
 
@@ -8708,6 +8965,12 @@ function closeSidebar() {
     if (destinationMarker && map.hasLayer(destinationMarker)) {
         map.removeLayer(destinationMarker);
     }
+
+    selectedTarget = null;
+    
+    const url = new URL(window.location.href);
+    url.search = '';
+    window.history.replaceState({}, '', url.toString());
 
     document.getElementById('sidebar-content').innerHTML = `
     <div class="space-y-6">
