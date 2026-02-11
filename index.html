@@ -1,4 +1,4 @@
-<!-- Compiled in Cursor | Last build update: 2/7/2026  5:38:56 PM | Version No. 5 -->
+<!-- Compiled in Cursor | Last build update: 2/11/2026  2:16:17 PM | Version No. 6 -->
 <!DOCTYPE html>
 <html lang="en">
     <head>
@@ -1523,6 +1523,20 @@
                         .image-gallery-grid::-webkit-scrollbar { width: 4px; }
                         .image-gallery-grid::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); border-radius: 2px; }
                         .image-gallery-grid::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 2px; }
+
+#share-btn, #copy-dest-btn {
+    position: relative;
+    transition: all 0.2s var(--ease-pro);
+}
+
+#share-btn:hover, #copy-dest-btn:hover {
+    background: rgba(255,255,255,0.1);
+    transform: scale(1.05);
+}
+
+#share-btn:active, #copy-dest-btn:active {
+    transform: scale(0.95);
+}
                     </style>
                 </head>
                 <body class="bg-black">
@@ -1649,12 +1663,20 @@
                         </div>
                         <div class="p-6 bg-white/[0.02] border-t border-white/5 flex gap-2">
                             <button id="start-nav-btn" class="hidden flex-1 h-12 bg-white text-black rounded-xl text-xs font-black flex items-center justify-center gap-3">
-                            <iconify-icon icon="lucide:navigation-2" class="text-lg"></iconify-icon> START NAVIGATION
+                            <iconify-icon icon="lucide:navigation-2" class="text-lg"></iconify-icon> START
+                            </button>
+                            <button id="sidebar-share-btn" class="hidden flex-1 h-12 bg-white/5 text-white rounded-xl text-xs font-black flex items-center justify-center gap-3 hover:bg-white/10 transition-all">
+                                <iconify-icon icon="lucide:share-2" class="text-lg"></iconify-icon> SHARE
                             </button>
                         </div>
                     </div>
 
                     <div class="absolute bottom-6 right-6 z-[1000] flex flex-col gap-3 ui-animate">
+                        <div class="strike-glass p-1 flex flex-col gap-1 mt-2">
+                            <button id="copy-dest-btn" class="w-10 h-10 flex items-center justify-center rounded-xl text-neutral-400 hover:text-white transition-all" title="Copy destination link">
+                            <iconify-icon icon="lucide:link-2" class="text-lg"></iconify-icon>
+                            </button>
+                        </div>
                         <div class="strike-glass p-1 flex flex-col gap-1">
                             <button id="sat-toggle" class="w-10 h-10 flex items-center justify-center rounded-xl text-neutral-400 hover:text-white transition-all"><iconify-icon icon="lucide:layers" class="text-lg"></iconify-icon></button>
                         </div>
@@ -3091,7 +3113,7 @@ async function getLocationImages(lat, lng, name, addressDetails) {
         if (commonsImages && commonsImages.length > 0) images.push(...commonsImages.slice(0, 5));
         if (osmImages && osmImages.length > 0) images.push(...osmImages);
 
-        console.log("Raw images collected:", images.length, images);
+        console.log("Raw img:", images.length, images);
 
         const processedImages = images.map((img, index) => ({
             image: img.image || img.url || getDefaultLocationImage(name, addressDetails),
@@ -3104,17 +3126,17 @@ async function getLocationImages(lat, lng, name, addressDetails) {
         const validImages = processedImages.filter(img => {
             const hasValidImage = img.image && img.image.startsWith('http');
             if (!hasValidImage) {
-                console.log("Filtering out invalid image:", img);
+                console.log("filter:", img);
             }
             return hasValidImage;
         });
 
-        console.log("Valid images after filtering:", validImages.length);
+        console.log("valid:", validImages.length);
 
         const uniqueImages = Array.from(new Map(validImages.map(img => [img.image, img])).values());
 
         window.currentLocationImages = uniqueImages;
-        console.log("Stored to window.currentLocationImages:", window.currentLocationImages.length);
+        console.log("Storage:", window.currentLocationImages.length);
 
         return {
             mainImage: uniqueImages[0] || {
@@ -3127,7 +3149,7 @@ async function getLocationImages(lat, lng, name, addressDetails) {
         };
 
     } catch (error) {
-    console.error("Image fetch error:", error);
+    console.error("Image error:", error);
     const defaultImg = {
         image: getDefaultLocationImage(name, addressDetails),
         description: `Photo of ${name}`,
@@ -4946,6 +4968,245 @@ function toggleStartPanel(e) {
 }
 }
 
+function initURLParameters() {
+    const urlParams = new URLSearchParams(window.location.search);
+    
+    if (urlParams.has('share') || urlParams.has('destination')) {
+        setTimeout(() => {
+            document.getElementById('loader').style.opacity = '0';
+            setTimeout(() => {
+                document.getElementById('loader').style.display = 'none';
+                document.body.classList.add('ui-ready');
+            }, 500);
+        }, 1000);
+    }
+    
+    if (urlParams.has('share')) {
+        const shareData = urlParams.get('share').split(';');
+        if (shareData.length >= 2) {
+            const startCoords = shareData[0].split(',').map(Number);
+            const endCoords = shareData[1].split(',').map(Number);
+            
+            if (isNaN(startCoords[0]) || isNaN(startCoords[1]) || isNaN(endCoords[0]) || isNaN(endCoords[1])) {
+                showToast(`Invalid share link`, 4000);
+                return;
+            }
+            
+            const mapType = urlParams.get('type') || 'osm';
+            
+            if (mapType === 'satellite' && !map.hasLayer(satLayer)) {
+                satLayer.addTo(map);
+            }
+            
+            setTimeout(() => {
+                customStartPos = startCoords;
+                customStartMode = 'map';
+                
+                if (customStartMarker) {
+                    map.removeLayer(customStartMarker);
+                }
+                
+                customStartMarker = L.marker(startCoords, {
+                    icon: L.divIcon({
+                        className: 'custom-start-marker',
+                        html: '<div style="background: #f59e0b; width: 16px; height: 16px; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 10px rgba(245,158,11,0.5);"></div>',
+                        iconSize: [22, 22],
+                        iconAnchor: [11, 11]
+                    })
+                }).addTo(map);
+                
+                document.getElementById('current-start-mode').textContent = 'Click on Map';
+                document.getElementById('start-point-coords').textContent = 
+                    `${startCoords[0].toFixed(4)}, ${startCoords[1].toFixed(4)}`;
+                
+                document.querySelector('.start-mode-btn[data-mode="map"]').classList.add('active');
+                document.querySelector('.start-mode-btn[data-mode="current"]').classList.remove('active');
+                
+                triggerAnalysis(endCoords[0], endCoords[1]);
+                
+                showToast(`Shared route loaded`, 3000);
+            }, 2000);
+        } else {
+            showToast(`Invalid share link format`, 4000);
+        }
+        return;
+    }
+    
+    if (urlParams.has('destination')) {
+        const destCoords = urlParams.get('destination').split(',').map(Number);
+        
+        if (isNaN(destCoords[0]) || isNaN(destCoords[1])) {
+            showToast(`Invalid destination link`, 4000);
+            return;
+        }
+        
+        const mapType = urlParams.get('type') || 'osm';
+        
+        if (mapType === 'satellite' && !map.hasLayer(satLayer)) {
+            satLayer.addTo(map);
+        }
+        
+        setTimeout(() => {
+            customStartMode = 'current';
+            customStartPos = null;
+            
+            if (customStartMarker && map.hasLayer(customStartMarker)) {
+                map.removeLayer(customStartMarker);
+            }
+            
+            document.querySelector('.start-mode-btn[data-mode="current"]').classList.add('active');
+            document.querySelector('.start-mode-btn[data-mode="map"]').classList.remove('active');
+            document.getElementById('current-start-mode').textContent = 'Current Location';
+            
+            triggerAnalysis(destCoords[0], destCoords[1]);
+            
+            showToast(`Destination loaded`, 3000);
+        }, 2000);
+    }
+}
+
+function generateShareURL() {
+    if (!selectedTarget) {
+        showToast(`No destination selected`, 3000);
+        return;
+    }
+    
+    const start = getCurrentStartPoint();
+    const end = selectedTarget;
+    
+    const shareString = `${start[0].toFixed(6)},${start[1].toFixed(6)};${end[0].toFixed(6)},${end[1].toFixed(6)}`;
+    const mapType = map.hasLayer(satLayer) ? 'satellite' : 'osm';
+    
+    const url = new URL(window.location.href);
+    url.searchParams.set('share', shareString);
+    url.searchParams.set('type', mapType);
+    
+    navigator.clipboard.writeText(url.toString()).then(() => {
+        showToast(`Share link copied to clipboard`, 3000);
+        window.history.replaceState({}, '', url.toString());
+    }).catch(() => {
+        showToast(`Failed to copy link`, 3000);
+    });
+}
+
+function generateDestinationURL() {
+    if (!selectedTarget) {
+        showToast(`No destination selected`, 3000);
+        return;
+    }
+    
+    const dest = selectedTarget;
+    const mapType = map.hasLayer(satLayer) ? 'satellite' : 'osm';
+    
+    const url = new URL(window.location.href);
+    url.searchParams.set('destination', `${dest[0].toFixed(6)},${dest[1].toFixed(6)}`);
+    url.searchParams.set('type', mapType);
+    
+    navigator.clipboard.writeText(url.toString()).then(() => {
+        showToast(`Destination link copied to clipboard`, 3000);
+        window.history.replaceState({}, '', url.toString());
+    }).catch(() => {
+        showToast(`Failed to copy link`, 3000);
+    });
+}
+
+let activeToast = null;
+
+function showToast(message, duration = 3000) {
+    if (activeToast) {
+        activeToast.style.animation = 'slideDown 0.3s ease forwards';
+        setTimeout(() => {
+            if (activeToast && activeToast.parentNode) {
+                activeToast.parentNode.removeChild(activeToast);
+            }
+            activeToast = null;
+            createNewToast(message, duration);
+        }, 300);
+    } else {
+        createNewToast(message, duration);
+    }
+}
+
+function createNewToast(message, duration) {
+    const toast = document.createElement('div');
+    toast.className = 'strike-glass fixed bottom-24 left-1/2 transform -translate-x-1/2 z-[9999] px-5 py-3 flex items-center gap-3 animate-slideUp';
+    toast.style.cssText = `
+        background: rgba(10, 10, 10, 0.95);
+        backdrop-filter: blur(30px);
+        border: 1px solid rgba(255,255,255,0.1);
+        border-radius: 100px;
+        color: white;
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: 0.3px;
+        box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+    `;
+    
+    let iconName = 'lucide:check-circle';
+    let iconColor = 'text-emerald-400';
+    
+    if (message.includes('⚠️') || message.includes('No destination') || message.includes('unavailable')) {
+        iconName = 'lucide:alert-triangle';
+        iconColor = 'text-yellow-400';
+    }
+    if (message.includes('❌') || message.includes('Failed')) {
+        iconName = 'lucide:x-circle';
+        iconColor = 'text-red-400';
+    }
+    if (message.includes('📍') || message.includes('Destination')) {
+        iconName = 'lucide:map-pin';
+        iconColor = 'text-sky-400';
+    }
+    if (message.includes('🔗') || message.includes('Share')) {
+        iconName = 'lucide:share-2';
+        iconColor = 'text-purple-400';
+    }
+    if (message.includes('🔄')) {
+        iconName = 'lucide:refresh-cw';
+        iconColor = 'text-blue-400';
+    }
+    
+    const icon = document.createElement('iconify-icon');
+    icon.setAttribute('icon', iconName);
+    icon.setAttribute('class', `${iconColor} text-lg`);
+    
+    toast.appendChild(icon);
+    toast.appendChild(document.createTextNode(message));
+    
+    document.body.appendChild(toast);
+    activeToast = toast;
+    
+    setTimeout(() => {
+        if (activeToast === toast) {
+            toast.style.animation = 'slideDown 0.3s ease forwards';
+            setTimeout(() => {
+                if (toast.parentNode) {
+                    toast.parentNode.removeChild(toast);
+                }
+                if (activeToast === toast) {
+                    activeToast = null;
+                }
+            }, 300);
+        }
+    }, duration);
+}
+
+const slideAnimations = `
+@keyframes slideUp {
+    from { transform: translate(-50%, 20px); opacity: 0; }
+    to { transform: translate(-50%, 0); opacity: 1; }
+}
+@keyframes slideDown {
+    from { transform: translate(-50%, 0); opacity: 1; }
+    to { transform: translate(-50%, 20px); opacity: 0; }
+}
+.animate-slideUp { animation: slideUp 0.3s ease forwards; }
+`;
+
+const styleSheet2 = document.createElement('style');
+styleSheet2.textContent = slideAnimations;
+document.head.appendChild(styleSheet2);
+
 window.addEventListener('resize', () => {
     const expanded = document.getElementById('custom-start-expanded');
     if (expanded.style.display === 'block') {
@@ -5495,7 +5756,7 @@ async function triggerAnalysis(lat, lng) {
                 console.log("Image data received:", imageData);
 
                 window.currentLocationImages = imageData.images || [];
-                console.log("Stored images globally:", window.currentLocationImages.length);
+                console.log("global store:", window.currentLocationImages.length);
             } catch (error) {
             console.error("Failed to fetch images:", error);
             imageData = { mainImage: null, images: [], total: 0 };
@@ -5592,6 +5853,9 @@ async function triggerAnalysis(lat, lng) {
 
     updateDestinationMarker(lat, lng, locationName);
 
+    document.getElementById('sidebar-share-btn').classList.remove('hidden');
+    document.getElementById('sidebar-share-btn').style.display = 'flex';
+
 } else {
 const imageData = await getLocationImages(lat, lng, "Location");
 
@@ -5633,7 +5897,7 @@ document.getElementById('sidebar-content').innerHTML = `
     <div id="logistics-module">
         <div class="flex items-center gap-2 mb-4">
             <iconify-icon icon="lucide:route" class="text-neutral-500"></iconify-icon>
-            <span class="text-[9px] font-bold text-neutral-500 uppercase tracking-widest">Routes via Engine</span>
+            <span class="text-[9px] font-bold text-neutral-500 uppercase tracking-widest">Routes</span>
         </div>
         <div id="route-options" class="flex flex-col gap-2"></div>
     </div>
@@ -5670,6 +5934,11 @@ document.getElementById('sidebar-content').innerHTML = `
 </div>
 `;
 }
+
+    const url = new URL(window.location.href);
+    url.searchParams.set('destination', `${lat.toFixed(6)},${lng.toFixed(6)}`);
+    url.searchParams.set('type', map.hasLayer(satLayer) ? 'satellite' : 'osm');
+    window.history.replaceState({}, '', url.toString());
 
 calculateRoutes(getCurrentStartPoint(), [lat, lng]);
 }
@@ -5900,6 +6169,49 @@ function estimateAirportSize(name, city, country) {
     return 'small';
 }
 
+async function isWaterCrossing(startCoords, endCoords) {
+    try {
+        const [startLat, startLng] = startCoords;
+        const [endLat, endLng] = endCoords;
+        
+        const startCheck = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${startLat}&lon=${startLng}`);
+        const startData = await startCheck.json();
+        
+        const endCheck = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${endLat}&lon=${endLng}`);
+        const endData = await endCheck.json();
+        
+        const startIsWater = startData.error || 
+                            (startData.address && (
+                                startData.address.sea || 
+                                startData.address.ocean || 
+                                startData.address.water
+                            ));
+        
+        const endIsWater = endData.error || 
+                          (endData.address && (
+                              endData.address.sea || 
+                              endData.address.ocean || 
+                              endData.address.water
+                          ));
+
+        const distance = map.distance(startCoords, endCoords) / 1000;
+        const isLongDistanceOverWater = distance > 100 && (startIsWater || endIsWater);
+        
+        const isHawaii = (startLat > 18 && startLat < 23 && startLng > -161 && startLng < -154) ||
+                        (endLat > 18 && endLat < 23 && endLng > -161 && endLng < -154);
+        
+        const isPhilippines = (startLat > 4 && startLat < 21 && startLng > 116 && startLng < 127) ||
+                             (endLat > 4 && endLat < 21 && endLng > 116 && endLng < 127);
+        
+        return startIsWater || endIsWater || isLongDistanceOverWater || isHawaii || isPhilippines;
+        
+    } catch (error) {
+        console.error("error checking if water:", error);
+        const distance = map.distance(startCoords, endCoords) / 1000;
+        return distance > 500;
+    }
+}
+
 async function findBestAirportForRoute(startCoords, endCoords) {
     const airports = await getCommercialAirports();
 
@@ -5909,8 +6221,11 @@ async function findBestAirportForRoute(startCoords, endCoords) {
         distance: map.distance(startCoords, airport.coordinates),
         score: calculateAirportScore(airport, startCoords)
     }))
-    .filter(a => a.distance < 150000)
+    .filter(a => a.distance < 1500000)
     .sort((a, b) => b.score - a.score);
+
+    const waterCrossing = await isWaterCrossing(startCoords, endCoords);
+    console.log(`crosses water: ${waterCrossing}`);
 
     const endAirports = airports
     .map(airport => ({
@@ -5918,8 +6233,24 @@ async function findBestAirportForRoute(startCoords, endCoords) {
         distance: map.distance(endCoords, airport.coordinates),
         score: calculateAirportScore(airport, endCoords)
     }))
-    .filter(a => a.distance < 150000)
+    .filter(a => a.distance < 1500000)
     .sort((a, b) => b.score - a.score);
+
+    if (waterCrossing) {
+        if (startAirports.length === 0) {
+            const closestStart = airports
+                .map(a => ({...a, distance: map.distance(startCoords, a.coordinates)}))
+                .sort((a, b) => a.distance - b.distance)[0];
+            if (closestStart) startAirports.push(closestStart);
+        }
+        
+        if (endAirports.length === 0) {
+            const closestEnd = airports
+                .map(a => ({...a, distance: map.distance(endCoords, a.coordinates)}))
+                .sort((a, b) => a.distance - b.distance)[0];
+            if (closestEnd) endAirports.push(closestEnd);
+        }
+    }
 
     if (startAirports.length === 0 || endAirports.length === 0) {
         return null;
@@ -5929,7 +6260,7 @@ async function findBestAirportForRoute(startCoords, endCoords) {
     const endAirport = endAirports[0];
 
     const airportDistance = map.distance(startAirport.coordinates, endAirport.coordinates);
-    if (airportDistance < 300000) {
+    if (!waterCrossing && airportDistance < 300000) {
         return null;
     }
 
@@ -6338,6 +6669,291 @@ function getCommercialAirports() {
     { code: "DKR", name: "Blaise Diagne International", city: "Dakar", country: "Senegal", coordinates: [14.7397, -17.4902], size: "medium" },
     { code: "LUN", name: "Kenneth Kaunda International", city: "Lusaka", country: "Zambia", coordinates: [-15.3308, 28.4527], size: "medium" },
     { code: "HRE", name: "Robert Gabriel Mugabe International", city: "Harare", country: "Zimbabwe", coordinates: [-17.9317, 31.0928], size: "medium" },
+
+{ code: "STT", name: "Cyril E. King Airport", city: "Charlotte Amalie", country: "US Virgin Islands", coordinates: [18.3373, -64.9734], size: "medium" },
+{ code: "STX", name: "Henry E. Rohlsen Airport", city: "Christiansted", country: "US Virgin Islands", coordinates: [17.7019, -64.7986], size: "medium" },
+{ code: "SXM", name: "Princess Juliana International Airport", city: "Philipsburg", country: "Sint Maarten", coordinates: [18.0410, -63.1089], size: "large" },
+{ code: "AXA", name: "Clayton J. Lloyd International Airport", city: "The Valley", country: "Anguilla", coordinates: [18.2048, -63.0551], size: "small" },
+{ code: "TAB", name: "Arthur Napoleon Raymond Robinson International Airport", city: "Scarborough", country: "Trinidad and Tobago", coordinates: [11.1497, -60.8322], size: "medium" },
+{ code: "BDA", name: "L.F. Wade International International Airport", city: "Hamilton", country: "Bermuda", coordinates: [32.3640, -64.6787], size: "medium" },
+{ code: "ANU", name: "V.C. Bird International Airport", city: "St. John's", country: "Antigua and Barbuda", coordinates: [17.1367, -61.7927], size: "medium" },
+{ code: "SKB", name: "Robert L. Bradshaw International Airport", city: "Basseterre", country: "Saint Kitts and Nevis", coordinates: [17.3112, -62.7187], size: "medium" },
+{ code: "SLU", name: "George F. L. Charles Airport", city: "Castries", country: "Saint Lucia", coordinates: [14.0202, -60.9929], size: "medium" },
+{ code: "UVF", name: "Hewanorra International Airport", city: "Vieux Fort", country: "Saint Lucia", coordinates: [13.7332, -60.9526], size: "medium" },
+{ code: "GND", name: "Maurice Bishop International Airport", city: "St. George's", country: "Grenada", coordinates: [12.0042, -61.7862], size: "medium" },
+{ code: "DOM", name: "Douglas–Charles Airport", city: "Marigot", country: "Dominica", coordinates: [15.5470, -61.3000], size: "small" },
+{ code: "SBH", name: "Gustaf III Airport", city: "Saint Barthélemy", country: "France", coordinates: [17.9044, -62.8436], size: "small" },
+{ code: "EIS", name: "Terrance B. Lettsome International Airport", city: "Road Town", country: "British Virgin Islands", coordinates: [18.4448, -64.5429], size: "small" },
+{ code: "VIJ", name: "Virgin Gorda Airport", city: "Spanish Town", country: "British Virgin Islands", coordinates: [18.4464, -64.4275], size: "small" },
+
+{ code: "CAG", name: "Cagliari Elmas Airport", city: "Cagliari", country: "Italy", coordinates: [39.2515, 9.0543], size: "large" },
+{ code: "OLB", name: "Olbia Costa Smeralda Airport", city: "Olbia", country: "Italy", coordinates: [40.8987, 9.5176], size: "large" },
+{ code: "SUF", name: "Lamezia Terme International Airport", city: "Lamezia Terme", country: "Italy", coordinates: [38.9054, 16.2423], size: "medium" },
+{ code: "PMO", name: "Falcone–Borsellino Airport", city: "Palermo", country: "Italy", coordinates: [38.1760, 13.0910], size: "large" },
+{ code: "CTA", name: "Catania–Fontanarossa Airport", city: "Catania", country: "Italy", coordinates: [37.4668, 15.0664], size: "large" },
+{ code: "LMP", name: "Lampedusa Airport", city: "Lampedusa", country: "Italy", coordinates: [35.4979, 12.6181], size: "small" },
+{ code: "PNL", name: "Pantelleria Airport", city: "Pantelleria", country: "Italy", coordinates: [36.8165, 11.9689], size: "small" },
+{ code: "JTR", name: "Santorini (Thira) National Airport", city: "Santorini", country: "Greece", coordinates: [36.3992, 25.4793], size: "medium" },
+{ code: "JSI", name: "Skiathos Island National Airport", city: "Skiathos", country: "Greece", coordinates: [39.1771, 23.5037], size: "medium" },
+{ code: "JMK", name: "Mykonos Island National Airport", city: "Mykonos", country: "Greece", coordinates: [37.4351, 25.3481], size: "medium" },
+{ code: "RHO", name: "Rhodes International Airport", city: "Rhodes", country: "Greece", coordinates: [36.4054, 28.0862], size: "large" },
+{ code: "CHQ", name: "Chania International Airport", city: "Chania", country: "Greece", coordinates: [35.5317, 24.1497], size: "large" },
+{ code: "HER", name: "Heraklion International Airport", city: "Heraklion", country: "Greece", coordinates: [35.3397, 25.1803], size: "large" },
+{ code: "CFU", name: "Corfu International Airport", city: "Corfu", country: "Greece", coordinates: [39.6019, 19.9117], size: "large" },
+{ code: "ZTH", name: "Zakynthos International Airport", city: "Zakynthos", country: "Greece", coordinates: [37.7509, 20.8843], size: "medium" },
+{ code: "KGS", name: "Kos International Airport", city: "Kos", country: "Greece", coordinates: [36.7933, 27.0917], size: "medium" },
+{ code: "KVA", name: "Kavala International Airport", city: "Kavala", country: "Greece", coordinates: [40.9133, 24.6192], size: "medium" },
+{ code: "SKG", name: "Thessaloniki Airport", city: "Thessaloniki", country: "Greece", coordinates: [40.5197, 22.9709], size: "large" },
+{ code: "MLA", name: "Malta International Airport", city: "Valletta", country: "Malta", coordinates: [35.8575, 14.4775], size: "large" },
+{ code: "LCA", name: "Larnaca International Airport", city: "Larnaca", country: "Cyprus", coordinates: [34.8751, 33.6249], size: "large" },
+{ code: "PFO", name: "Paphos International Airport", city: "Paphos", country: "Cyprus", coordinates: [34.7180, 32.4857], size: "large" },
+{ code: "ECN", name: "Ercan International Airport", city: "Nicosia", country: "Cyprus", coordinates: [35.1547, 33.4961], size: "medium" },
+{ code: "DBV", name: "Dubrovnik Airport", city: "Dubrovnik", country: "Croatia", coordinates: [42.5614, 18.2682], size: "large" },
+{ code: "SPU", name: "Split Airport", city: "Split", country: "Croatia", coordinates: [43.5389, 16.2980], size: "large" },
+{ code: "PUY", name: "Pula Airport", city: "Pula", country: "Croatia", coordinates: [44.8935, 13.9222], size: "medium" },
+{ code: "ZAD", name: "Zadar Airport", city: "Zadar", country: "Croatia", coordinates: [44.1083, 15.3467], size: "medium" },
+{ code: "BWK", name: "Brač Airport", city: "Brač", country: "Croatia", coordinates: [43.2857, 16.6797], size: "small" },
+{ code: "LSZ", name: "Lošinj Airport", city: "Lošinj", country: "Croatia", coordinates: [44.5658, 14.3931], size: "small" },
+{ code: "TIV", name: "Tivat Airport", city: "Tivat", country: "Montenegro", coordinates: [42.4047, 18.7233], size: "medium" },
+{ code: "TGD", name: "Podgorica Airport", city: "Podgorica", country: "Montenegro", coordinates: [42.3594, 19.2519], size: "medium" },
+
+{ code: "LOP", name: "Lombok International Airport", city: "Praya", country: "Indonesia", coordinates: [-8.7573, 116.2767], size: "large" },
+{ code: "BPN", name: "Sultan Aji Muhammad Sulaiman Airport", city: "Balikpapan", country: "Indonesia", coordinates: [-1.2683, 116.8944], size: "large" },
+{ code: "UPG", name: "Sultan Hasanuddin International Airport", city: "Makassar", country: "Indonesia", coordinates: [-5.0616, 119.5540], size: "large" },
+{ code: "MDC", name: "Sam Ratulangi International Airport", city: "Manado", country: "Indonesia", coordinates: [1.5492, 124.9263], size: "large" },
+{ code: "DPS", name: "Ngurah Rai International Airport", city: "Denpasar", country: "Indonesia", coordinates: [-8.7482, 115.1672], size: "large" },
+{ code: "KOE", name: "El Tari International Airport", city: "Kupang", country: "Indonesia", coordinates: [-10.1716, 123.6711], size: "medium" },
+{ code: "BIK", name: "Frans Kaisiepo International Airport", city: "Biak", country: "Indonesia", coordinates: [-1.1900, 136.1080], size: "medium" },
+{ code: "SOQ", name: "Domine Eduard Osok Airport", city: "Sorong", country: "Indonesia", coordinates: [-0.8940, 131.2870], size: "medium" },
+{ code: "TIM", name: "Moses Kilangin Airport", city: "Timika", country: "Indonesia", coordinates: [-4.5283, 136.8875], size: "medium" },
+{ code: "LBJ", name: "Komodo Airport", city: "Labuan Bajo", country: "Indonesia", coordinates: [-8.4867, 119.8894], size: "medium" },
+{ code: "BTH", name: "Hang Nadim International Airport", city: "Batam", country: "Indonesia", coordinates: [1.1210, 104.1188], size: "large" },
+{ code: "PKU", name: "Sultan Syarif Kasim II International Airport", city: "Pekanbaru", country: "Indonesia", coordinates: [0.4608, 101.4445], size: "large" },
+{ code: "PLM", name: "Sultan Mahmud Badaruddin II International Airport", city: "Palembang", country: "Indonesia", coordinates: [-2.8983, 104.7019], size: "large" },
+{ code: "JOG", name: "Adisutjipto International Airport", city: "Yogyakarta", country: "Indonesia", coordinates: [-7.7882, 110.4318], size: "large" },
+{ code: "SRG", name: "Ahmad Yani International Airport", city: "Semarang", country: "Indonesia", coordinates: [-6.9714, 110.3741], size: "medium" },
+{ code: "SOC", name: "Adisumarmo International Airport", city: "Surakarta", country: "Indonesia", coordinates: [-7.5161, 110.7569], size: "medium" },
+{ code: "PDG", name: "Minangkabau International Airport", city: "Padang", country: "Indonesia", coordinates: [-0.7867, 100.2808], size: "large" },
+{ code: "BTJ", name: "Sultan Iskandar Muda International Airport", city: "Banda Aceh", country: "Indonesia", coordinates: [5.5235, 95.4203], size: "large" },
+{ code: "KNO", name: "Kualanamu International Airport", city: "Medan", country: "Indonesia", coordinates: [3.6424, 98.8854], size: "large" },
+
+{ code: "MPH", name: "Godofredo P. Ramos Airport", city: "Malay", country: "Philippines", coordinates: [11.9245, 121.9541], size: "medium" },
+{ code: "USU", name: "Francisco B. Reyes Airport", city: "Coron", country: "Philippines", coordinates: [12.1215, 120.1000], size: "small" },
+{ code: "ENI", name: "El Nido Airport", city: "El Nido", country: "Philippines", coordinates: [11.2026, 119.4166], size: "small" },
+{ code: "BXU", name: "Bancasi Airport", city: "Butuan", country: "Philippines", coordinates: [8.9515, 125.4777], size: "medium" },
+{ code: "CGM", name: "Camiguin Airport", city: "Mambajao", country: "Philippines", coordinates: [9.2536, 124.7076], size: "small" },
+{ code: "IAO", name: "Sayak Airport", city: "Del Carmen", country: "Philippines", coordinates: [9.8591, 126.0167], size: "small" },
+{ code: "SUG", name: "Surigao Airport", city: "Surigao", country: "Philippines", coordinates: [9.7558, 125.4809], size: "small" },
+{ code: "DGT", name: "Dumaguete-Sibulan Airport", city: "Dumaguete", country: "Philippines", coordinates: [9.3337, 123.3005], size: "medium" },
+{ code: "TAC", name: "Daniel Z. Romualdez Airport", city: "Tacloban", country: "Philippines", coordinates: [11.2276, 125.0278], size: "medium" },
+{ code: "BCD", name: "Bacolod-Silay Airport", city: "Bacolod", country: "Philippines", coordinates: [10.7764, 123.0146], size: "medium" },
+{ code: "ILO", name: "Iloilo International Airport", city: "Iloilo", country: "Philippines", coordinates: [10.7130, 122.5453], size: "large" },
+{ code: "PPS", name: "Puerto Princesa International Airport", city: "Puerto Princesa", country: "Philippines", coordinates: [9.7421, 118.7587], size: "large" },
+{ code: "ZAM", name: "Zamboanga International Airport", city: "Zamboanga", country: "Philippines", coordinates: [6.9224, 122.0596], size: "medium" },
+{ code: "CGY", name: "Laguindingan Airport", city: "Cagayan de Oro", country: "Philippines", coordinates: [8.6125, 124.4565], size: "medium" },
+{ code: "GES", name: "General Santos International Airport", city: "General Santos", country: "Philippines", coordinates: [6.1064, 125.2353], size: "medium" },
+
+{ code: "OKA", name: "Naha Airport", city: "Naha", country: "Japan", coordinates: [26.1958, 127.6459], size: "large" },
+{ code: "ISG", name: "New Ishigaki Airport", city: "Ishigaki", country: "Japan", coordinates: [24.3964, 124.2450], size: "medium" },
+{ code: "MMY", name: "Miyako Airport", city: "Miyakojima", country: "Japan", coordinates: [24.7828, 125.2950], size: "medium" },
+{ code: "SHI", name: "Shimojishima Airport", city: "Shimojishima", country: "Japan", coordinates: [24.8267, 125.1447], size: "medium" },
+{ code: "KTD", name: "Kitadaito Airport", city: "Kitadaito", country: "Japan", coordinates: [25.9447, 131.3267], size: "small" },
+{ code: "MMD", name: "Minami-Daito Airport", city: "Minamidaito", country: "Japan", coordinates: [25.8465, 131.2635], size: "small" },
+{ code: "TNE", name: "New Tanegashima Airport", city: "Tanegashima", country: "Japan", coordinates: [30.5500, 130.9500], size: "small" },
+{ code: "KOJ", name: "Kagoshima Airport", city: "Kagoshima", country: "Japan", coordinates: [31.8034, 130.7194], size: "large" },
+{ code: "KMJ", name: "Kumamoto Airport", city: "Kumamoto", country: "Japan", coordinates: [32.8373, 130.8551], size: "large" },
+{ code: "OIT", name: "Oita Airport", city: "Oita", country: "Japan", coordinates: [33.4794, 131.7372], size: "medium" },
+{ code: "MYJ", name: "Matsuyama Airport", city: "Matsuyama", country: "Japan", coordinates: [33.8272, 132.6998], size: "medium" },
+{ code: "TAK", name: "Takamatsu Airport", city: "Takamatsu", country: "Japan", coordinates: [34.2142, 134.0156], size: "medium" },
+{ code: "KCZ", name: "Kochi Ryoma Airport", city: "Kochi", country: "Japan", coordinates: [33.5461, 133.6694], size: "medium" },
+{ code: "HSG", name: "Saga Airport", city: "Saga", country: "Japan", coordinates: [33.1497, 130.3022], size: "small" },
+{ code: "FUK", name: "Fukuoka Airport", city: "Fukuoka", country: "Japan", coordinates: [33.5859, 130.4507], size: "large" },
+{ code: "NGS", name: "Nagasaki Airport", city: "Nagasaki", country: "Japan", coordinates: [32.9169, 129.9136], size: "large" },
+{ code: "KMQ", name: "Komatsu Airport", city: "Komatsu", country: "Japan", coordinates: [36.3946, 136.4065], size: "medium" },
+{ code: "HIJ", name: "Hiroshima Airport", city: "Hiroshima", country: "Japan", coordinates: [34.4361, 132.9194], size: "large" },
+{ code: "OKJ", name: "Okayama Airport", city: "Okayama", country: "Japan", coordinates: [34.7569, 133.8553], size: "medium" },
+{ code: "IZO", name: "Izumo Airport", city: "Izumo", country: "Japan", coordinates: [35.4136, 132.8900], size: "small" },
+{ code: "YGJ", name: "Miho-Yonago Airport", city: "Yonago", country: "Japan", coordinates: [35.4922, 133.2364], size: "small" },
+{ code: "TTJ", name: "Tottori Airport", city: "Tottori", country: "Japan", coordinates: [35.5300, 134.1667], size: "small" },
+{ code: "CTS", name: "New Chitose Airport", city: "Sapporo", country: "Japan", coordinates: [42.7752, 141.6923], size: "large" },
+{ code: "AKJ", name: "Asahikawa Airport", city: "Asahikawa", country: "Japan", coordinates: [43.6708, 142.4475], size: "medium" },
+{ code: "HKD", name: "Hakodate Airport", city: "Hakodate", country: "Japan", coordinates: [41.7700, 140.8219], size: "medium" },
+{ code: "KUH", name: "Kushiro Airport", city: "Kushiro", country: "Japan", coordinates: [43.0410, 144.1930], size: "medium" },
+{ code: "MMB", name: "Memanbetsu Airport", city: "Ozora", country: "Japan", coordinates: [43.8806, 144.1641], size: "medium" },
+{ code: "SHB", name: "Nakashibetsu Airport", city: "Nakashibetsu", country: "Japan", coordinates: [43.5775, 144.9600], size: "small" },
+{ code: "WKJ", name: "Wakkanai Airport", city: "Wakkanai", country: "Japan", coordinates: [45.4042, 141.8008], size: "small" },
+
+{ code: "CJU", name: "Jeju International Airport", city: "Jeju", country: "South Korea", coordinates: [33.5113, 126.4930], size: "large" },
+{ code: "PUS", name: "Gimhae International Airport", city: "Busan", country: "South Korea", coordinates: [35.1795, 128.9382], size: "large" },
+{ code: "KUV", name: "Gunsan Airport", city: "Gunsan", country: "South Korea", coordinates: [35.9818, 126.7159], size: "small" },
+{ code: "MWX", name: "Muan International Airport", city: "Muan", country: "South Korea", coordinates: [34.9914, 126.3828], size: "medium" },
+{ code: "RSU", name: "Yeosu Airport", city: "Yeosu", country: "South Korea", coordinates: [34.8423, 127.6169], size: "small" },
+{ code: "USN", name: "Ulsan Airport", city: "Ulsan", country: "South Korea", coordinates: [35.5935, 129.3517], size: "small" },
+{ code: "YNY", name: "Yangyang International Airport", city: "Yangyang", country: "South Korea", coordinates: [38.0613, 128.6690], size: "small" },
+
+{ code: "KHH", name: "Kaohsiung International Airport", city: "Kaohsiung", country: "Taiwan", coordinates: [22.5771, 120.3500], size: "large" },
+{ code: "TNN", name: "Tainan Airport", city: "Tainan", country: "Taiwan", coordinates: [22.9504, 120.2058], size: "medium" },
+{ code: "RMQ", name: "Taichung International Airport", city: "Taichung", country: "Taiwan", coordinates: [24.2647, 120.6206], size: "medium" },
+{ code: "HUN", name: "Hualien Airport", city: "Hualien", country: "Taiwan", coordinates: [24.0231, 121.6169], size: "small" },
+{ code: "TTT", name: "Taitung Airport", city: "Taitung", country: "Taiwan", coordinates: [22.7549, 121.1017], size: "small" },
+{ code: "MZG", name: "Makung Airport", city: "Makung", country: "Taiwan", coordinates: [23.5687, 119.6283], size: "medium" },
+{ code: "KNH", name: "Kinmen Airport", city: "Kinmen", country: "Taiwan", coordinates: [24.4279, 118.3591], size: "medium" },
+{ code: "LZN", name: "Matsu Nangan Airport", city: "Nangan", country: "Taiwan", coordinates: [26.1598, 119.9583], size: "small" },
+
+{ code: "GOH", name: "Nuuk Airport", city: "Nuuk", country: "Greenland", coordinates: [64.1909, -51.6781], size: "medium" },
+{ code: "SFJ", name: "Kangerlussuaq Airport", city: "Kangerlussuaq", country: "Greenland", coordinates: [67.0169, -50.6893], size: "medium" },
+{ code: "JAV", name: "Ilulissat Airport", city: "Ilulissat", country: "Greenland", coordinates: [69.2432, -51.0571], size: "small" },
+{ code: "KEF", name: "Keflavík International Airport", city: "Reykjavík", country: "Iceland", coordinates: [63.9850, -22.6056], size: "large" },
+{ code: "AEY", name: "Akureyri Airport", city: "Akureyri", country: "Iceland", coordinates: [65.6600, -18.0727], size: "medium" },
+{ code: "EGS", name: "Egilsstaðir Airport", city: "Egilsstaðir", country: "Iceland", coordinates: [65.2833, -14.4014], size: "small" },
+{ code: "IFJ", name: "Ísafjörður Airport", city: "Ísafjörður", country: "Iceland", coordinates: [66.0581, -23.1353], size: "small" },
+{ code: "LYR", name: "Svalbard Airport", city: "Longyearbyen", country: "Norway", coordinates: [78.2461, 15.4656], size: "medium" },
+{ code: "TOS", name: "Tromsø Airport", city: "Tromsø", country: "Norway", coordinates: [69.6833, 18.9189], size: "large" },
+{ code: "BOO", name: "Bodø Airport", city: "Bodø", country: "Norway", coordinates: [67.2692, 14.3653], size: "medium" },
+{ code: "EVE", name: "Harstad/Narvik Airport, Evenes", city: "Evenes", country: "Norway", coordinates: [68.4913, 16.6781], size: "medium" },
+{ code: "KKN", name: "Kirkenes Airport", city: "Kirkenes", country: "Norway", coordinates: [69.7258, 29.8913], size: "medium" },
+{ code: "ALF", name: "Alta Airport", city: "Alta", country: "Norway", coordinates: [69.9761, 23.3717], size: "medium" },
+{ code: "HFT", name: "Hammerfest Airport", city: "Hammerfest", country: "Norway", coordinates: [70.6797, 23.6686], size: "small" },
+
+{ code: "RUN", name: "Roland Garros Airport", city: "Saint-Denis", country: "Réunion", coordinates: [-20.8871, 55.5103], size: "large" },
+{ code: "TNR", name: "Ivato International Airport", city: "Antananarivo", country: "Madagascar", coordinates: [-18.7969, 47.4788], size: "large" },
+{ code: "NOS", name: "Fascene Airport", city: "Nosy Be", country: "Madagascar", coordinates: [-13.3121, 48.3148], size: "medium" },
+{ code: "DZA", name: "Dzaoudzi Pamandzi International Airport", city: "Dzaoudzi", country: "Mayotte", coordinates: [-12.8047, 45.2811], size: "medium" },
+{ code: "SEZ", name: "Seychelles International Airport", city: "Victoria", country: "Seychelles", coordinates: [-4.6743, 55.5218], size: "medium" },
+{ code: "PRI", name: "Praslin Island Airport", city: "Praslin", country: "Seychelles", coordinates: [-4.3193, 55.6914], size: "small" },
+{ code: "MRU", name: "Sir Seewoosagur Ramgoolam International Airport", city: "Port Louis", country: "Mauritius", coordinates: [-20.4302, 57.6836], size: "large" },
+{ code: "RRG", name: "Sir Gaëtan Duval Airport", city: "Rodrigues", country: "Mauritius", coordinates: [-19.7577, 63.3610], size: "small" },
+{ code: "CPT", name: "Cape Town International Airport", city: "Cape Town", country: "South Africa", coordinates: [-33.9648, 18.6017], size: "large" },
+{ code: "GRJ", name: "George Airport", city: "George", country: "South Africa", coordinates: [-34.0056, 22.3789], size: "medium" },
+{ code: "PLZ", name: "Port Elizabeth International Airport", city: "Gqeberha", country: "South Africa", coordinates: [-33.9849, 25.6173], size: "medium" },
+{ code: "DUR", name: "King Shaka International Airport", city: "Durban", country: "South Africa", coordinates: [-29.6144, 31.1190], size: "large" },
+{ code: "HLE", name: "Saint Helena Airport", city: "Jamestown", country: "Saint Helena", coordinates: [-15.9590, -5.6459], size: "small" },
+{ code: "ASU", name: "Silvio Pettirossi International Airport", city: "Asunción", country: "Paraguay", coordinates: [-25.2398, -57.5191], size: "large" },
+{ code: "CAB", name: "Cabinda Airport", city: "Cabinda", country: "Angola", coordinates: [-5.5970, 12.1884], size: "medium" },
+{ code: "SSA", name: "Salvador International Airport", city: "Salvador", country: "Brazil", coordinates: [-12.9107, -38.3310], size: "large" },
+{ code: "NAT", name: "São Gonçalo do Amarante - Governador Aluízio Alves International Airport", city: "Natal", country: "Brazil", coordinates: [-5.7683, -35.3761], size: "large" },
+{ code: "FOR", name: "Fortaleza International Airport", city: "Fortaleza", country: "Brazil", coordinates: [-3.7763, -38.5326], size: "large" },
+{ code: "REC", name: "Recife International Airport", city: "Recife", country: "Brazil", coordinates: [-8.1268, -34.9240], size: "large" },
+{ code: "MCZ", name: "Zumbi dos Palmares International Airport", city: "Maceió", country: "Brazil", coordinates: [-9.5108, -35.7917], size: "medium" },
+{ code: "JPA", name: "Presidente Castro Pinto International Airport", city: "João Pessoa", country: "Brazil", coordinates: [-7.1450, -34.9486], size: "medium" },
+{ code: "AJU", name: "Santa Maria Airport", city: "Aracaju", country: "Brazil", coordinates: [-10.9840, -37.0703], size: "medium" },
+{ code: "CGB", name: "Marechal Rondon International Airport", city: "Cuiabá", country: "Brazil", coordinates: [-15.6529, -56.1167], size: "medium" },
+{ code: "GYN", name: "Santa Genoveva Airport", city: "Goiânia", country: "Brazil", coordinates: [-16.6320, -49.2207], size: "medium" },
+
+{ code: "SCL", name: "Arturo Merino Benítez International Airport", city: "Santiago", country: "Chile", coordinates: [-33.3930, -70.7858], size: "large" },
+{ code: "PUQ", name: "Presidente Carlos Ibáñez del Campo International Airport", city: "Punta Arenas", country: "Chile", coordinates: [-53.0026, -70.8546], size: "medium" },
+{ code: "PMC", name: "El Tepual International Airport", city: "Puerto Montt", country: "Chile", coordinates: [-41.4389, -73.0940], size: "medium" },
+{ code: "ZCO", name: "Maquehue Airport", city: "Temuco", country: "Chile", coordinates: [-38.7668, -72.6371], size: "small" },
+{ code: "CCP", name: "Carriel Sur International Airport", city: "Concepción", country: "Chile", coordinates: [-36.7726, -73.0631], size: "medium" },
+{ code: "IQQ", name: "Diego Aracena International Airport", city: "Iquique", country: "Chile", coordinates: [-20.5352, -70.1813], size: "medium" },
+{ code: "ANF", name: "Cerro Moreno International Airport", city: "Antofagasta", country: "Chile", coordinates: [-23.4445, -70.4451], size: "medium" },
+{ code: "IPC", name: "Mataveri International Airport", city: "Hanga Roa", country: "Chile", coordinates: [-27.1648, -109.4218], size: "medium" },
+{ code: "WPR", name: "Captain Fuentes Martínez Airport", city: "Porvenir", country: "Chile", coordinates: [-53.2537, -70.3192], size: "small" },
+
+{ code: "MPN", name: "RAF Mount Pleasant", city: "Mount Pleasant", country: "Falkland Islands", coordinates: [-51.8228, -58.4472], size: "medium" },
+{ code: "PSY", name: "Port Stanley Airport", city: "Stanley", country: "Falkland Islands", coordinates: [-51.6857, -57.7776], size: "small" },
+
+{ code: "ASU", name: "Silvio Pettirossi International Airport", city: "Asunción", country: "Paraguay", coordinates: [-25.2398, -57.5191], size: "large" },
+{ code: "VVI", name: "Viru Viru International Airport", city: "Santa Cruz", country: "Bolivia", coordinates: [-17.6448, -63.1354], size: "large" },
+{ code: "LPB", name: "El Alto International Airport", city: "La Paz", country: "Bolivia", coordinates: [-16.5133, -68.1923], size: "large" },
+
+{ code: "BAH", name: "Bahrain International Airport", city: "Manama", country: "Bahrain", coordinates: [26.2708, 50.6336], size: "large" },
+{ code: "DOH", name: "Hamad International Airport", city: "Doha", country: "Qatar", coordinates: [25.2609, 51.6138], size: "large" },
+{ code: "AUH", name: "Abu Dhabi International Airport", city: "Abu Dhabi", country: "UAE", coordinates: [24.4330, 54.6511], size: "large" },
+{ code: "DXB", name: "Dubai International Airport", city: "Dubai", country: "UAE", coordinates: [25.2532, 55.3657], size: "large" },
+{ code: "DWC", name: "Al Maktoum International Airport", city: "Dubai", country: "UAE", coordinates: [24.8861, 55.1722], size: "large" },
+{ code: "SHJ", name: "Sharjah International Airport", city: "Sharjah", country: "UAE", coordinates: [25.3286, 55.5172], size: "medium" },
+{ code: "MCT", name: "Muscat International Airport", city: "Muscat", country: "Oman", coordinates: [23.5933, 58.2844], size: "large" },
+{ code: "SLL", name: "Salalah Airport", city: "Salalah", country: "Oman", coordinates: [17.0387, 54.0913], size: "medium" },
+{ code: "KWI", name: "Kuwait International Airport", city: "Kuwait City", country: "Kuwait", coordinates: [29.2266, 47.9689], size: "large" },
+
+        { code: "HNL", name: "Daniel K. Inouye International", city: "Honolulu", country: "USA", coordinates: [21.3243, -157.9252], size: "large" },
+        { code: "OGG", name: "Kahului Airport", city: "Kahului", country: "USA", coordinates: [20.8986, -156.4305], size: "large" },
+        { code: "KOA", name: "Kona International Airport", city: "Kailua-Kona", country: "USA", coordinates: [19.7388, -156.0456], size: "large" },
+        { code: "LIH", name: "Lihue Airport", city: "Lihue", country: "USA", coordinates: [21.9762, -159.3389], size: "large" },
+        { code: "ITO", name: "Hilo International Airport", city: "Hilo", country: "USA", coordinates: [19.7203, -155.0485], size: "medium" },
+        { code: "JHM", name: "Kapalua Airport", city: "Lahaina", country: "USA", coordinates: [20.9629, -156.6730], size: "small" },
+        { code: "MKK", name: "Molokai Airport", city: "Hoolehua", country: "USA", coordinates: [21.1529, -157.0961], size: "small" },
+        { code: "LNY", name: "Lanai Airport", city: "Lanai City", country: "USA", coordinates: [20.7856, -156.9514], size: "small" },
+        
+        { code: "KEF", name: "Keflavík International Airport", city: "Reykjavík", country: "Iceland", coordinates: [63.9850, -22.6056], size: "large" },
+        { code: "RKV", name: "Reykjavík Airport", city: "Reykjavík", country: "Iceland", coordinates: [64.1300, -21.9406], size: "medium" },
+        { code: "AEY", name: "Akureyri Airport", city: "Akureyri", country: "Iceland", coordinates: [65.6600, -18.0727], size: "medium" },
+        { code: "EGS", name: "Egilsstaðir Airport", city: "Egilsstaðir", country: "Iceland", coordinates: [65.2833, -14.4014], size: "small" },
+        { code: "IFJ", name: "Ísafjörður Airport", city: "Ísafjörður", country: "Iceland", coordinates: [66.0581, -23.1353], size: "small" },
+        { code: "HZK", name: "Húsavík Airport", city: "Húsavík", country: "Iceland", coordinates: [65.9523, -17.4260], size: "small" },
+        { code: "VPN", name: "Vopnafjörður Airport", city: "Vopnafjörður", country: "Iceland", coordinates: [65.7206, -14.8506], size: "small" },
+        { code: "THO", name: "Þórshöfn Airport", city: "Þórshöfn", country: "Iceland", coordinates: [66.2185, -15.3356], size: "small" },
+        { code: "GRY", name: "Grímsey Airport", city: "Grímsey", country: "Iceland", coordinates: [66.5547, -18.0175], size: "small" },
+        
+        { code: "CRK", name: "Clark International Airport", city: "Angeles", country: "Philippines", coordinates: [15.1858, 120.5603], size: "large" },
+        { code: "ILO", name: "Iloilo International Airport", city: "Iloilo", country: "Philippines", coordinates: [10.7130, 122.5453], size: "medium" },
+        { code: "PPS", name: "Puerto Princesa International Airport", city: "Puerto Princesa", country: "Philippines", coordinates: [9.7421, 118.7587], size: "medium" },
+        { code: "KLO", name: "Kalibo International Airport", city: "Kalibo", country: "Philippines", coordinates: [11.6794, 122.3763], size: "medium" },
+        { code: "MPH", name: "Godofredo P. Ramos Airport", city: "Malay", country: "Philippines", coordinates: [11.9245, 121.9541], size: "medium" },
+        { code: "TAG", name: "Bohol-Panglao International Airport", city: "Panglao", country: "Philippines", coordinates: [9.5701, 123.7726], size: "medium" },
+        { code: "ZAM", name: "Zamboanga International Airport", city: "Zamboanga", country: "Philippines", coordinates: [6.9224, 122.0596], size: "medium" },
+        { code: "CGY", name: "Laguindingan Airport", city: "Cagayan de Oro", country: "Philippines", coordinates: [8.6125, 124.4565], size: "medium" },
+        { code: "BCD", name: "Bacolod-Silay Airport", city: "Bacolod", country: "Philippines", coordinates: [10.7764, 123.0146], size: "medium" },
+        { code: "RXS", name: "Roxas Airport", city: "Roxas", country: "Philippines", coordinates: [11.5977, 122.7517], size: "small" },
+        
+        { code: "SJU", name: "Luis Muñoz Marín International Airport", city: "San Juan", country: "Puerto Rico", coordinates: [18.4394, -66.0018], size: "large" },
+        { code: "PUJ", name: "Punta Cana International Airport", city: "Punta Cana", country: "Dominican Republic", coordinates: [18.5674, -68.3634], size: "large" },
+        { code: "SDQ", name: "Las Américas International Airport", city: "Santo Domingo", country: "Dominican Republic", coordinates: [18.4297, -69.6689], size: "large" },
+        { code: "MBJ", name: "Sangster International Airport", city: "Montego Bay", country: "Jamaica", coordinates: [18.5037, -77.9134], size: "large" },
+        { code: "KIN", name: "Norman Manley International Airport", city: "Kingston", country: "Jamaica", coordinates: [17.9357, -76.7875], size: "large" },
+        { code: "NAS", name: "Lynden Pindling International Airport", city: "Nassau", country: "Bahamas", coordinates: [25.0390, -77.4662], size: "large" },
+        { code: "FPO", name: "Grand Bahama International Airport", city: "Freeport", country: "Bahamas", coordinates: [26.5587, -78.6956], size: "medium" },
+        { code: "GCM", name: "Owen Roberts International Airport", city: "George Town", country: "Cayman Islands", coordinates: [19.2928, -81.3577], size: "medium" },
+        { code: "CUR", name: "Curaçao International Airport", city: "Willemstad", country: "Curaçao", coordinates: [12.1889, -68.9598], size: "medium" },
+        { code: "AUA", name: "Queen Beatrix International Airport", city: "Oranjestad", country: "Aruba", coordinates: [12.5014, -70.0152], size: "medium" },
+        { code: "BGI", name: "Grantley Adams International Airport", city: "Bridgetown", country: "Barbados", coordinates: [13.0746, -59.4925], size: "medium" },
+        { code: "POS", name: "Piarco International Airport", city: "Port of Spain", country: "Trinidad and Tobago", coordinates: [10.5954, -61.3372], size: "medium" },
+        
+        { code: "GUM", name: "Antonio B. Won Pat International Airport", city: "Hagåtña", country: "Guam", coordinates: [13.4839, 144.7960], size: "large" },
+        { code: "SPN", name: "Saipan International Airport", city: "Saipan", country: "Northern Mariana Islands", coordinates: [15.1190, 145.7290], size: "medium" },
+        { code: "ROR", name: "Roman Tmetuchl International Airport", city: "Koror", country: "Palau", coordinates: [7.3673, 134.5443], size: "medium" },
+        { code: "MAJ", name: "Marshall Islands International Airport", city: "Majuro", country: "Marshall Islands", coordinates: [7.0649, 171.2720], size: "medium" },
+        { code: "KSA", name: "Kosrae International Airport", city: "Kosrae", country: "Micronesia", coordinates: [5.3570, 162.9580], size: "small" },
+        { code: "PNI", name: "Pohnpei International Airport", city: "Pohnpei", country: "Micronesia", coordinates: [6.9851, 158.2090], size: "small" },
+        { code: "TKK", name: "Chuuk International Airport", city: "Chuuk", country: "Micronesia", coordinates: [7.4619, 151.8430], size: "small" },
+        { code: "YAP", name: "Yap International Airport", city: "Yap", country: "Micronesia", coordinates: [9.4989, 138.0820], size: "small" },
+        { code: "APW", name: "Faleolo International Airport", city: "Apia", country: "Samoa", coordinates: [-13.8300, -172.0083], size: "medium" },
+        { code: "TBU", name: "Fuaʻamotu International Airport", city: "Nukuʻalofa", country: "Tonga", coordinates: [-21.2412, -175.1494], size: "medium" },
+        { code: "VLI", name: "Bauerfield International Airport", city: "Port Vila", country: "Vanuatu", coordinates: [-17.6993, 168.3198], size: "medium" },
+        { code: "NOU", name: "La Tontouta International Airport", city: "Nouméa", country: "New Caledonia", coordinates: [-22.0146, 166.2130], size: "medium" },
+        { code: "PPT", name: "Faa'a International Airport", city: "Papeete", country: "French Polynesia", coordinates: [-17.5567, -149.6114], size: "medium" },
+        { code: "RAR", name: "Rarotonga International Airport", city: "Avarua", country: "Cook Islands", coordinates: [-21.2027, -159.8056], size: "small" },
+        
+        { code: "PMI", name: "Palma de Mallorca Airport", city: "Palma", country: "Spain", coordinates: [39.5517, 2.7388], size: "large" },
+        { code: "IBZ", name: "Ibiza Airport", city: "Ibiza", country: "Spain", coordinates: [38.8729, 1.3731], size: "large" },
+        { code: "MAH", name: "Menorca Airport", city: "Mahón", country: "Spain", coordinates: [39.8626, 4.2186], size: "medium" },
+        { code: "ACE", name: "Lanzarote Airport", city: "Arrecife", country: "Spain", coordinates: [28.9455, -13.6052], size: "large" },
+        { code: "LPA", name: "Gran Canaria Airport", city: "Las Palmas", country: "Spain", coordinates: [27.9319, -15.3866], size: "large" },
+        { code: "TFS", name: "Tenerife South Airport", city: "Tenerife", country: "Spain", coordinates: [28.0445, -16.5725], size: "large" },
+        { code: "TFN", name: "Tenerife North Airport", city: "Tenerife", country: "Spain", coordinates: [28.4827, -16.3415], size: "large" },
+        { code: "FUE", name: "Fuerteventura Airport", city: "Puerto del Rosario", country: "Spain", coordinates: [28.4527, -13.8638], size: "large" },
+        { code: "SPC", name: "La Palma Airport", city: "Santa Cruz de La Palma", country: "Spain", coordinates: [28.6265, -17.7556], size: "medium" },
+        { code: "VDE", name: "El Hierro Airport", city: "Valverde", country: "Spain", coordinates: [27.8148, -17.8871], size: "small" },
+        { code: "GMZ", name: "La Gomera Airport", city: "San Sebastián de La Gomera", country: "Spain", coordinates: [28.0296, -17.2146], size: "small" },
+        { code: "FNC", name: "Madeira Airport", city: "Funchal", country: "Portugal", coordinates: [32.6941, -16.7745], size: "large" },
+        { code: "PXO", name: "Porto Santo Airport", city: "Porto Santo", country: "Portugal", coordinates: [33.0734, -16.3500], size: "medium" },
+        { code: "PDL", name: "João Paulo II Airport", city: "Ponta Delgada", country: "Portugal", coordinates: [37.7412, -25.6979], size: "large" },
+        { code: "TER", name: "Lajes Airport", city: "Terceira", country: "Portugal", coordinates: [38.7618, -27.0908], size: "medium" },
+        { code: "HOR", name: "Horta Airport", city: "Horta", country: "Portugal", coordinates: [38.5199, -28.7159], size: "small" },
+        { code: "FLW", name: "Flores Airport", city: "Santa Cruz das Flores", country: "Portugal", coordinates: [39.4553, -31.1314], size: "small" },
+        { code: "GRW", name: "Graciosa Airport", city: "Santa Cruz da Graciosa", country: "Portugal", coordinates: [39.0922, -28.0298], size: "small" },
+        { code: "SMA", name: "Santa Maria Airport", city: "Vila do Porto", country: "Portugal", coordinates: [36.9714, -25.1706], size: "small" },
+        { code: "BJV", name: "Milas-Bodrum Airport", city: "Bodrum", country: "Turkey", coordinates: [37.2506, 27.6643], size: "large" },
+        { code: "DLM", name: "Dalaman Airport", city: "Dalaman", country: "Turkey", coordinates: [36.7131, 28.7926], size: "large" },
+        { code: "AYT", name: "Antalya Airport", city: "Antalya", country: "Turkey", coordinates: [36.8987, 30.8005], size: "large" },
+        
+        { code: "MRU", name: "Sir Seewoosagur Ramgoolam International Airport", city: "Port Louis", country: "Mauritius", coordinates: [-20.4302, 57.6836], size: "large" },
+        { code: "RUN", name: "Roland Garros Airport", city: "Saint-Denis", country: "Réunion", coordinates: [-20.8871, 55.5103], size: "large" },
+        { code: "TNR", name: "Ivato International Airport", city: "Antananarivo", country: "Madagascar", coordinates: [-18.7969, 47.4788], size: "large" },
+        { code: "DZA", name: "Dzaoudzi Pamandzi International Airport", city: "Dzaoudzi", country: "Mayotte", coordinates: [-12.8047, 45.2811], size: "medium" },
+        { code: "SEZ", name: "Seychelles International Airport", city: "Victoria", country: "Seychelles", coordinates: [-4.6743, 55.5218], size: "medium" },
+        { code: "MLE", name: "Velana International Airport", city: "Malé", country: "Maldives", coordinates: [4.1918, 73.5291], size: "large" },
     ];
 }
 
@@ -6525,20 +7141,17 @@ function getEssentialAirports() {
     ];
 }
 
-function shouldShowFlightRoute(start, end, distance) {
-    if (distance < 100000) return false;
+async function shouldShowFlightRoute(start, end, distance) {
+    const distanceKm = distance / 1000;
+    
+    if (distanceKm > 800) return true;
+    
+    const waterCrossing = await isWaterCrossing(start, end);
+    
+    if (waterCrossing && distanceKm > 100) return true;
 
-    if (distance < 300000) {
-        const startAirport = findNearestMajorAirport(start);
-        const endAirport = findNearestMajorAirport(end);
-
-        if (startAirport && endAirport && startAirport.code === endAirport.code) {
-            return false;
-        }
-    }
-
-    if (distance > 300000) return true;
-
+    if (distanceKm > 300) return true;
+    
     return false;
 }
 
@@ -6549,6 +7162,7 @@ async function calculateFlightRoute(start, end, distance) {
     if (!airports) return null;
 
     const { start: startAirport, end: endAirport } = airports;
+    console.log(`located - ${startAirport} to ${endAirport}`);
 
     const toAirportDistance = startAirport.distance;
     const airportToAirportDistance = map.distance(startAirport.coordinates, endAirport.coordinates);
@@ -6566,9 +7180,6 @@ async function calculateFlightRoute(start, end, distance) {
 
     const directDistance = map.distance(start, end);
     const drivingTime = (directDistance / 80000) * 3600;
-    if (totalTime > drivingTime * 0.8) {
-        return null;
-    }
 
     return {
         id: 'flight',
@@ -8060,8 +8671,21 @@ function getArrival(seconds) {
     return arrival.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
+document.getElementById('sidebar-share-btn').addEventListener('click', () => {
+    if (selectedTarget) {
+        if (customStartMode === 'current' && !userPos) {
+            showToast(`Acton failed, location unavailable`, 3000);
+            return;
+        }
+        generateShareURL();
+    } else {
+        showToast(`No destination selected`, 3000);
+    }
+});
+
 function closeSidebar() {
     document.getElementById('info-sidebar').classList.remove('active');
+    document.getElementById('sidebar-share-btn').classList.add('hidden');
     routeLayer.clearLayers();
     currentRoute = null;
     currentNavRoute = null;
@@ -8287,6 +8911,10 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     });
+
+    document.getElementById('copy-dest-btn').addEventListener('click', generateDestinationURL);
+    
+    initURLParameters();
 
     document.getElementById('locate-btn').addEventListener('click', recenterMap);
 
