@@ -1,4 +1,4 @@
-<!-- Compiled in Cursor | Last build update: 2/11/2026  5:31:00 PM | Version No. 7 -->
+<!-- Compiled in Cursor | Last build update: 2/11/2026  8:21:35 PM | Version No. 7 -->
 <!DOCTYPE html>
 <html lang="en">
     <head>
@@ -6134,10 +6134,51 @@ async function triggerAnalysis(lat, lng) {
 
         document.getElementById('side-title').innerText = locationName;
 
-        const addressParts = [p.street, p.city, p.country, p.postcode].filter(Boolean);
-        const addressString = addressParts.length > 0 ?
-        addressParts.join(', ') :
-        `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+        const addressParts = [];
+
+        if (p.housenumber && p.street) {
+            addressParts.push(`${p.housenumber} ${p.street}`);
+        } else if (p.street) {
+            addressParts.push(p.street);
+        } else if (p.housenumber) {
+            addressParts.push(p.housenumber);
+        }
+
+        if (p.city) {
+            addressParts.push(p.city);
+        } else if (p.town) {
+            addressParts.push(p.town);
+        } else if (p.village) {
+            addressParts.push(p.village);
+        } else if (p.hamlet) {
+            addressParts.push(p.hamlet);
+        } else if (p.locality) {
+            addressParts.push(p.locality);
+        }
+
+        if (p.county && !addressParts.includes(p.county) && p.county !== p.city && p.county !== p.town && p.county !== p.village) {
+            addressParts.push(p.county);
+        }
+
+        if (p.state) {
+            addressParts.push(p.state);
+        } else if (p.region) {
+            addressParts.push(p.region);
+        } else if (p.province) {
+            addressParts.push(p.province);
+        }
+
+        if (p.postcode) {
+            addressParts.push(p.postcode);
+        }
+
+        if (p.country) {
+            addressParts.push(p.country);
+        }
+
+        const addressString = addressParts.filter(Boolean).length > 0 ?
+            addressParts.filter(Boolean).join(', ') :
+            `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
 
         let sidebarHTML = `
         <div class="space-y-6">
