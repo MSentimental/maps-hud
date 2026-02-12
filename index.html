@@ -1839,15 +1839,37 @@
                                                             document.getElementById('sidebar-share-btn').classList.add('hidden');
                                                             showToast('Internet connection restored', 3000);
                                                             if (selectedTarget) {
+                                                                document.getElementById('side-title').innerText = "Refreshing...";
                                                                 verifyInternetConnection().then(isConnected => {
                                                                     if (isConnected) {
                                                                         setTimeout(() => {
                                                                             const start = getCurrentStartPoint();
                                                                             const end = selectedTarget;
                                                                             triggerAnalysis(end[0], end[1]);
-                                                                        }, 8000);
+                                                                        }, 5200);
                                                                     } else {
                                                                         showToast('Failed to calculate route - no internet connection', 3000);
+                                                                        document.getElementById('side-title').innerText = "Location";
+                                                                        document.getElementById('sidebar-content').innerHTML = `
+                                                                            <div class="space-y-6">
+                                                                                <div class="h-32 rounded-xl bg-gradient-to-br from-gray-900 to-black border border-white/10 flex items-center justify-center">
+                                                                                    <div class="text-center">
+                                                                                        <iconify-icon icon="lucide:map-pin" class="text-3xl text-white/30 mb-2"></iconify-icon>
+                                                                                        <div class="text-sm text-white/50">Select a location</div>
+                                                                                    </div>
+                                                                                </div>
+
+                                                                                <div class="space-y-2">
+                                                                                    <div class="flex items-center gap-2">
+                                                                                        <iconify-icon icon="lucide:map-pin" class="text-neutral-500"></iconify-icon>
+                                                                                        <span class="text-[9px] font-bold text-neutral-500 uppercase tracking-widest">Navigation Info</span>
+                                                                                    </div>
+                                                                                    <p class="text-xs text-neutral-300 leading-relaxed">
+                                                                                        Search or click on the map to view the location's images (if any) and navigation routes.
+                                                                                    </p>
+                                                                                </div>
+                                                                            </div>
+                                                                        `;
                                                                     }
                                                                 });           
                                                             }
@@ -2044,11 +2066,6 @@
                                                             customStartInput.disabled = true;
                                                             customStartInput.placeholder = 'Search unavailable (offline)';
                                         }
-                                        
-                                        window.calculateRoutes = function() {
-                                                            showToast('Failed to calculate - route calculation requires internet', 3000);
-                                                            return;
-                                        };
                     }
 
                     function enableOnlineFeatures() {
