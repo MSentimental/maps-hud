@@ -6,16 +6,28 @@ const FONT_DOMAINS = [
   "fonts.gstatic.com"
 ];
 
+const CORE_STUFF = [
+  "/",
+  "/index.html"
+];
+
 const TILE_DOMAINS = [
   "tile.openstreetmap.org"
 ];
 
 const ASSET_DOMAINS = [
   "cdn.jsdelivr.net",
+  "cdn.tailwindcss.com",
   "unpkg.com"
 ];
 
 self.addEventListener("install", event => {
+  event.waitUntil(
+    caches.open(CACHE_NAME).then(cache => {
+      return cache.addAll(CORE_STUFF);
+    })
+  );
+
   self.skipWaiting();
 });
 
@@ -33,17 +45,24 @@ self.addEventListener("activate", event => {
 });
 
 self.addEventListener("fetch", event => {
-  const url = new URL(event.request.url);
-
   if (event.request.method !== "GET") return;
 
-  if (
-    FONT_DOMAINS.includes(url.hostname) ||
-    TILE_DOMAINS.includes(url.hostname) ||
-    ASSET_DOMAINS.includes(url.hostname)
-  ) {
-    event.respondWith(cacheFirst(event.request));
-  }
+  event.respondWith(
+    fetch(event.request)
+      .then(response => {
+        const clone = response.clone();
+        caches.open(CACHE_NAME).then(cache => {
+          cache.put(event.request, clone);
+        });
+
+        return response;
+      })
+      .catch(() => {
+        return caches.match(event.request).then(cached => {
+          return cached || caches.match("/index.html");
+        });
+      })
+  );
 });
 
 async function cacheFirst(request) {
