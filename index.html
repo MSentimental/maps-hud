@@ -1820,9 +1820,6 @@
                                                             document.getElementById('info-sidebar').classList.remove('active');
                                                             document.getElementById('sidebar-share-btn').classList.add('hidden');
                                                             showToast('Internet connection restored', 3000);
-                                                            if (selectedTarget) {
-                                                                                calculateRoutes(getCurrentStartPoint(), selectedTarget);
-                                                            }
                                         });
                                         
                                         window.addEventListener('offline', () => {
