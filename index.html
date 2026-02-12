@@ -1524,19 +1524,19 @@
                         .image-gallery-grid::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); border-radius: 2px; }
                         .image-gallery-grid::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 2px; }
 
-#share-btn, #copy-dest-btn {
-    position: relative;
-    transition: all 0.2s var(--ease-pro);
-}
+                        #share-btn, #copy-dest-btn {
+                            position: relative;
+                            transition: all 0.2s var(--ease-pro);
+                        }
 
-#share-btn:hover, #copy-dest-btn:hover {
-    background: rgba(255,255,255,0.1);
-    transform: scale(1.05);
-}
+                        #share-btn:hover, #copy-dest-btn:hover {
+                            background: rgba(255,255,255,0.1);
+                            transform: scale(1.05);
+                        }
 
-#share-btn:active, #copy-dest-btn:active {
-    transform: scale(0.95);
-}
+                        #share-btn:active, #copy-dest-btn:active {
+                            transform: scale(0.95);
+                        }
                     </style>
                 </head>
                 <body class="bg-black">
@@ -1723,14 +1723,9 @@
                         let map = null;
                         let darkBase = null;
                         let satLayer = null;
-                        const userIcon = L.divIcon({
-                            className: 'user-location-marker',
-                            html: '<div class="gps-ring"></div>',
-                            iconSize: [24, 24],
-                            iconAnchor: [12, 12]
-                        });
-                        let userMarker = L.marker([0,0], {icon: userIcon});
-                        let routeLayer = L.layerGroup();
+                        let userIcon = null;
+                        let userMarker = null;
+                        let routeLayer = null;
                         let userPos = null;
                         let selectedTarget = null;
                         let currentRoute = null;
@@ -1771,6 +1766,295 @@
                     let allRouteLayers = [];
                     let allNavigationLayers = [];
                     let allMarkers = [];
+
+                    let isOnline = navigator.onLine;
+                    let offlineModeEnabled = false;
+
+                    function initializeLeafletObjects() {
+                                        if (typeof L === 'undefined') {
+                                                            console.warn('Leaflet not loaded - likely offline');
+                                                            return false;
+                                        }
+                                        
+                                        try {
+                                                            userIcon = L.divIcon({
+                                                                                className: 'user-location-marker',
+                                                                                html: '<div class="gps-ring"></div>',
+                                                                                iconSize: [24, 24],
+                                                                                iconAnchor: [12, 12]
+                                                            });
+                                                            
+                                                            userMarker = L.marker([0,0], {icon: userIcon});
+                                                            routeLayer = L.layerGroup();
+                                                            
+                                                            customStartMarker = L.marker([0,0], {
+                                                                                icon: L.divIcon({
+                                                                                                    className: 'custom-start-marker',
+                                                                                                    html: '<div style="background: #f59e0b; width: 16px; height: 16px; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 10px rgba(245,158,11,0.5);"></div>',
+                                                                                                    iconSize: [22, 22],
+                                                                                                    iconAnchor: [11, 11]
+                                                                                })
+                                                            });
+                                                            
+                                                            destinationMarker = L.marker([0,0], {
+                                                                                icon: L.divIcon({
+                                                                                                    className: 'destination-marker',
+                                                                                                    html: '<div style="background: #ef4444; width: 16px; height: 16px; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 10px rgba(239,68,68,0.5); position: relative;"><div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 6px; height: 6px; background: white; border-radius: 50%;"></div></div>',
+                                                                                                    iconSize: [22, 22],
+                                                                                                    iconAnchor: [11, 11]
+                                                                                }),
+                                                                                zIndexOffset: 1000
+                                                            });
+                                                            
+                                                            return true;
+                                        } catch (error) {
+                                                            console.error('Failed to initialize Leaflet objects:', error);
+                                                            return false;
+                                        }
+                    }
+
+                    function initConnectivityDetection() {
+                                        window.addEventListener('online', () => {
+                                                            isOnline = true;
+                                                            hideOfflineOverlay();
+                                                            document.getElementById('info-sidebar').classList.remove('active');
+                                                            document.getElementById('sidebar-share-btn').classList.add('hidden');
+                                                            window.location.reload();
+                                                            showToast('Internet connection restored', 3000);
+                                                            if (selectedTarget) {
+                                                                                calculateRoutes(getCurrentStartPoint(), selectedTarget);
+                                                            }
+                                        });
+                                        
+                                        window.addEventListener('offline', () => {
+                                                            isOnline = false;
+                                                            showOfflineOverlay();
+                                                            showToast('Failed to load - no internet connection', 4000);
+                                        });
+                                        
+                                        if (!navigator.onLine) {
+                                                            setTimeout(() => {
+                                                                                showOfflineOverlay();
+                                                            }, 1000);
+                                        }
+                    }
+
+                    function showOfflineOverlay() {
+                        const loader = document.getElementById('loader');
+                        if (!loader) return;
+
+                        if (loader) {
+                            loader.style.opacity = '0';
+                            loader.style.display = 'none';
+                        }
+                        
+                        const originalContent = loader.querySelectorAll('svg, div.text-\\[9px\\], div.loading-bar');
+                        originalContent.forEach(el => el.style.display = 'none');
+                        
+                        const standardUI = document.getElementById('standard-ui');
+                        const mapPage = document.getElementById('map');
+                        const infoSidebarElement = document.getElementById('info-sidebar');
+                        const custmSt = document.getElementById('custom-start-panel');
+                        if (standardUI) {
+                            standardUI.style.opacity = '0.5';
+                            standardUI.style.pointerEvents = 'none';
+                        }
+                        if (custmSt) {
+                            custmSt.style.opacity = '0.5';
+                            custmSt.style.pointerEvents = 'none';
+                        }
+                        if (mapPage) {
+                            mapPage.style.pointerEvents = 'none';
+                        }
+                        if (infoSidebarElement) {
+                            infoSidebarElement.style.opacity = '0.5';
+                            infoSidebarElement.style.pointerEvents = 'none';
+                        }
+                        document.querySelectorAll('.bottom-6.right-6 .strike-glass, .bottom-6.left-6 .strike-glass').forEach(el => {
+                            el.style.opacity = '0.5';
+                            el.style.pointerEvents = 'none';
+                        });
+                        
+                        disableOnlineFeatures();
+                    }
+
+                    function hideOfflineOverlay() {
+                        const loader = document.getElementById('loader');
+                        if (!loader) return;
+                        
+                        if (navigator.onLine) {
+                            loader.classList.remove('offline-mode');
+                            
+                            const offlineUI = loader.querySelector('.offline-ui');
+                            if (offlineUI) {
+                                offlineUI.remove();
+                            }
+                            
+                            const originalContent = loader.querySelectorAll('svg, div.text-\\[9px\\], div.loading-bar');
+                            originalContent.forEach(el => el.style.display = '');
+                            
+                            loader.style.opacity = '0';
+                            setTimeout(() => {
+                                if (navigator.onLine) {
+                                    loader.style.display = 'none';
+                                    document.body.classList.add('ui-ready');
+                                }
+                            }, 500);
+
+                            document.querySelectorAll('.bottom-6.right-6 .strike-glass, .bottom-6.left-6 .strike-glass').forEach(el => {
+                                el.style.opacity = '1';
+                                el.style.pointerEvents = 'auto';
+                            });
+                            
+                            document.getElementById('standard-ui').style.opacity = '1';
+                            document.getElementById('standard-ui').style.pointerEvents = 'auto';
+                            document.getElementById('custom-start-panel').style.opacity = '1';
+                            document.getElementById('custom-start-panel').style.pointerEvents = 'auto';
+                            document.getElementById('map').style.pointerEvents = 'auto';
+                            document.getElementById('info-sidebar').style.opacity = '1';
+                            document.getElementById('info-sidebar').style.pointerEvents = 'auto';
+                            
+                            enableOnlineFeatures();
+                        }
+                    }
+
+                    window.retryConnection = function() {
+                                        const loader = document.getElementById('loader');
+                                        if (!loader) return;
+                                        
+                                        const button = loader.querySelector('button:first-child');
+                                        if (button) {
+                                                            const originalHTML = button.innerHTML;
+                                                            button.innerHTML = '<iconify-icon icon="lucide:loader-2" class="text-lg animate-spin"></iconify-icon> Checking...';
+                                                            button.disabled = true;
+                                                            
+                                                            fetch('https://www.google.com/favicon.ico', { 
+                                                                                mode: 'no-cors',
+                                                                                cache: 'no-store',
+                                                                                timeout: 5000 
+                                                            })
+                                                            .then(() => {
+                                                                                if (navigator.onLine) {
+                                                                                                    hideOfflineOverlay();
+                                                                                } else {
+                                                                                                    throw new Error('Fetch failed - you are still offline');
+                                                                                }
+                                                            })
+                                                            .catch(() => {
+                                                                                button.innerHTML = originalHTML;
+                                                                                button.disabled = false;
+                                                                                showToast('Failed to load - you are still offline', 3000);
+                                                                                
+                                                                                const icon = loader.querySelector('iconify-icon[icon="lucide:wifi-off"]');
+                                                                                if (icon) {
+                                                                                                    icon.classList.add('text-red-300');
+                                                                                                    setTimeout(() => icon.classList.remove('text-red-300'), 500);
+                                                                                }
+                                                            });
+                                        }
+                    };
+
+                    window.enableOfflineMode = function() {
+                                        offlineModeEnabled = true;
+                                        hideOfflineOverlay();
+                                        
+                                        showToast('Offline mode enabled - Limited functionality', 5000);
+                                        
+                                        const offlineBadge = document.createElement('div');
+                                        offlineBadge.id = 'offline-badge';
+                                        offlineBadge.className = 'fixed top-6 left-1/2 transform -translate-x-1/2 z-[9999] bg-red-500/90 backdrop-blur px-4 py-2 rounded-full flex items-center gap-2 text-xs font-bold text-white border border-red-400/50';
+                                        offlineBadge.innerHTML = `
+                                                            <iconify-icon icon="lucide:wifi-off" class="text-sm"></iconify-icon>
+                                                            OFFLINE MODE
+                                                            <button onclick="disableOfflineMode()" class="ml-2 text-white/70 hover:text-white">
+                                                                                <iconify-icon icon="lucide:x" class="text-sm"></iconify-icon>
+                                                            </button>
+                                        `;
+                                        document.body.appendChild(offlineBadge);
+                                        
+                                        enableOfflineFeatures();
+                    };
+
+                    window.disableOfflineMode = function() {
+                                        offlineModeEnabled = false;
+                                        const badge = document.getElementById('offline-badge');
+                                        if (badge) badge.remove();
+                                        
+                                        if (navigator.onLine) {
+                                                            showToast('Online mode restored', 3000);
+                                                            enableOnlineFeatures();
+                                        } else {
+                                                            showOfflineOverlay();
+                                        }
+                    };
+
+                    function disableOnlineFeatures() {
+                                        const searchInput = document.getElementById('search-input');
+                                        if (searchInput) {
+                                                            searchInput.disabled = true;
+                                                            searchInput.placeholder = 'Search unavailable (offline)';
+                                        }
+                                        
+                                        const customStartInput = document.getElementById('custom-start-input');
+                                        if (customStartInput) {
+                                                            customStartInput.disabled = true;
+                                                            customStartInput.placeholder = 'Search unavailable (offline)';
+                                        }
+                                        
+                                        window.calculateRoutes = function() {
+                                                            showToast('Failed to calculate - route calculation requires internet', 3000);
+                                                            return;
+                                        };
+                    }
+
+                    function enableOnlineFeatures() {
+                                        const searchInput = document.getElementById('search-input');
+                                        if (searchInput) {
+                                                            searchInput.disabled = false;
+                                                            searchInput.placeholder = 'Search destination...';
+                                        }
+                                        
+                                        const customStartInput = document.getElementById('custom-start-input');
+                                        if (customStartInput) {
+                                                            customStartInput.disabled = false;
+                                                            customStartInput.placeholder = 'Enter starting address or city...';
+                                        }
+                    }
+
+                    function enableOfflineFeatures() {
+                                        console.log('Offline mode enabled - Limited functionality');
+                    }
+
+                    function checkConnectivityBeforeLoad() {
+                                        if (!navigator.onLine) {
+                                                            const loader = document.getElementById('loader');
+                                                            if (loader) {
+                                                                                showOfflineOverlay();
+                                                            }
+                                                            return false;
+                                        }
+                                        return true;
+                    }
+
+                    const offlineStyles = `
+                                        @keyframes pulse-offline {
+                                                            0%, 100% { opacity: 1; }
+                                                            50% { opacity: 0.8; }
+                                        }
+
+                                        #offline-badge {
+                                                            animation: pulse-offline 2s infinite;
+                                                            box-shadow: 0 0 20px rgba(239, 68, 68, 0.3);
+                                        }
+
+                                        #offline-badge:hover {
+                                                            animation: none;
+                                        }
+                    `;
+
+                    const offlineStyleSheet = document.createElement('style');
+                    offlineStyleSheet.textContent = offlineStyles;
+                    document.head.appendChild(offlineStyleSheet);
 
                     function createStraightPath(start, end) {
                         return {
@@ -4868,47 +5152,41 @@ return baseInstruction.replace(/Drive|Car/g, "Cycle").replace(/driving/gi, "cycl
 }
 
 function initMap() {
-    map = L.map('map', {
-        zoomControl: false,
-        attributionControl: false,
-        maxBounds: [[-85, -10000], [85, 10000]],
-        maxBoundsViscosity: 1.0,
-        worldCopyJump: true,
-        minZoom: 3
-    }).setView([40.7128, -74.0060], 2);
+    if (typeof L === 'undefined') {
+        console.error('Cannot init map');
+        return false;
+    }
+    
+    try {
+        map = L.map('map', {
+            zoomControl: false,
+            attributionControl: false,
+            maxBounds: [[-85, -10000], [85, 10000]],
+            maxBoundsViscosity: 1.0,
+            worldCopyJump: true,
+            minZoom: 3
+        }).setView([40.7128, -74.0060], 2);
 
-    darkBase = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 19,
-    className: 'dark-layer',
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-}).addTo(map);
+        darkBase = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            className: 'dark-layer',
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
 
-satLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-maxZoom: 19
-});
+        satLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            maxZoom: 19
+        });
 
-routeLayer.addTo(map);
+        initializeLeafletObjects();
 
-userMarker.addTo(map);
-
-customStartMarker = L.marker([0,0], {
-    icon: L.divIcon({
-        className: 'custom-start-marker',
-        html: '<div style="background: #f59e0b; width: 16px; height: 16px; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 10px rgba(245,158,11,0.5);"></div>',
-        iconSize: [22, 22],
-        iconAnchor: [11, 11]
-    })
-});
-
-destinationMarker = L.marker([0,0], {
-    icon: L.divIcon({
-        className: 'destination-marker',
-        html: '<div style="background: #ef4444; width: 16px; height: 16px; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 10px rgba(239,68,68,0.5); position: relative;"><div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 6px; height: 6px; background: white; border-radius: 50%;"></div></div>',
-        iconSize: [22, 22],
-        iconAnchor: [11, 11]
-    }),
-    zIndexOffset: 1000
-});
+        if (routeLayer) routeLayer.addTo(map);
+        if (userMarker) userMarker.addTo(map);
+        
+        return true;
+    } catch (error) {
+        console.error('Map initialization failed:', error);
+        return false;
+    }
 }
 
 function setupMapEvents() {
@@ -5556,6 +5834,11 @@ return userPos || [40.7128, -74.0060];
 }
 
 window.onload = () => {
+    initConnectivityDetection();
+    
+    if (!checkConnectivityBeforeLoad()) {
+        return;
+    }
     initMap();
 
     document.getElementById('custom-start-toggle').addEventListener('click', toggleStartPanel);
@@ -5641,13 +5924,14 @@ setTimeout(() => {
             document.getElementById('status-text').innerText = "GPS Unavailable";
 
             updateStartPointDisplay();
-
-            document.getElementById('loader').style.opacity = '0';
-            setTimeout(() => {
-                document.getElementById('loader').style.display = 'none';
-                document.body.classList.add('ui-ready');
-                setupMapEvents();
-            }, 500);
+            if (navigator.onLine) {
+                document.getElementById('loader').style.opacity = '0';
+                setTimeout(() => {
+                    document.getElementById('loader').style.display = 'none';
+                    document.body.classList.add('ui-ready');
+                    setupMapEvents();
+                }, 500);
+            }
         },
         {
             enableHighAccuracy: true,
@@ -5661,13 +5945,14 @@ setTimeout(() => {
     map.setView(userPos, 2);
 
     updateStartPointDisplay();
-
-    document.getElementById('loader').style.opacity = '0';
-    setTimeout(() => {
-        document.getElementById('loader').style.display = 'none';
-        document.body.classList.add('ui-ready');
-        setupMapEvents();
-    }, 500);
+    if (navigator.onLine) {
+        document.getElementById('loader').style.opacity = '0';
+        setTimeout(() => {
+            document.getElementById('loader').style.display = 'none';
+            document.body.classList.add('ui-ready');
+            setupMapEvents();
+        }, 500);
+    }
 }
 }, 2000);
 };
@@ -9176,8 +9461,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     document.getElementById('copy-dest-btn').addEventListener('click', generateDestinationURL);
-    
-    initURLParameters();
 
     document.getElementById('locate-btn').addEventListener('click', recenterMap);
 
@@ -9197,6 +9480,10 @@ document.getElementById('zoom-out').addEventListener('click', () => {
     map.zoomOut();
 });
 
+if (checkConnectivityBeforeLoad()) {
+    initURLParameters();
+}
+
 document.getElementById('exit-nav-btn').addEventListener('click', exitNavigation);
 
 document.addEventListener('click', (e) => {
@@ -9210,6 +9497,12 @@ document.addEventListener('click', (e) => {
 });
 });
 
+setTimeout(() => {
+    if (!navigator.onLine) {
+        showOfflineOverlay();
+    }
+}, 1000);
+
 window.addEventListener('beforeunload', () => {
     if (watchId) {
         navigator.geolocation.clearWatch(watchId);
@@ -9218,6 +9511,12 @@ window.addEventListener('beforeunload', () => {
         clearInterval(gpsWatchInterval);
     }
 });
+
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/sw.js");
+  });
+}
 </script>
 
 </body>
