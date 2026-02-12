@@ -1,7 +1,6 @@
 const CACHE_NAME = "app-cache-v1";
 const CORE_ASSETS = [
-  "/index.html",
-  "/"
+  "/index.html"
 ];
 
 self.addEventListener("install", event => {
@@ -38,7 +37,7 @@ self.addEventListener("fetch", event => {
   }
 
   event.respondWith(
-    fetch(event.request).catch(() => caches.match("/"))
+    fetch(event.request).catch(() => caches.match("/index.html"))
   );
 });
 
