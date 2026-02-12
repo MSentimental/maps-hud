@@ -1,4 +1,4 @@
-<!-- Compiled in Cursor | Last build update: 2/11/2026  4:28:28 PM | Version No. 7 -->
+<!-- Compiled in Cursor | Last build update: 2/11/2026  2:48:15 PM | Version No. 7 -->
 <!DOCTYPE html>
 <html lang="en">
     <head>
@@ -1874,6 +1874,9 @@
                             el.style.opacity = '0.5';
                             el.style.pointerEvents = 'none';
                         });
+                        document.querySelectorAll('.destination-marker').forEach(el => {
+                            el.style.pointerEvents = 'none';
+                        });
                         
                         disableOnlineFeatures();
                     }
@@ -1903,6 +1906,9 @@
 
                             document.querySelectorAll('.bottom-6.right-6 .strike-glass, .bottom-6.left-6 .strike-glass').forEach(el => {
                                 el.style.opacity = '1';
+                                el.style.pointerEvents = 'auto';
+                            });
+                            document.querySelectorAll('.destination-marker').forEach(el => {
                                 el.style.pointerEvents = 'auto';
                             });
                             
