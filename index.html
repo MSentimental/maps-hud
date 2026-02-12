@@ -1,4 +1,4 @@
-<!-- Compiled in Cursor | Last build update: 2/11/2026  2:48:15 PM | Version No. 7 -->
+<!-- Compiled in Cursor | Last build update: 2/11/2026  4:28:28 PM | Version No. 7 -->
 <!DOCTYPE html>
 <html lang="en">
     <head>
@@ -5248,6 +5248,16 @@ function toggleStartPanel(e) {
 
 function initURLParameters() {
     const urlParams = new URLSearchParams(window.location.search);
+
+    if (!map) {
+        const checkMapInterval = setInterval(() => {
+            if (map) {
+                clearInterval(checkMapInterval);
+                initURLParameters();
+            }
+        }, 100);
+        return;
+    }
     
     if (urlParams.has('share') || urlParams.has('destination')) {
         setTimeout(() => {
