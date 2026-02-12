@@ -1830,6 +1830,7 @@
                                                             isOnline = false;
                                                             showOfflineOverlay();
                                                             showToast('Failed to load - no internet connection', 4000);
+                                                            console.warn('User does not have any internet connection.');
                                         });
                                         
                                         if (!navigator.onLine) {
