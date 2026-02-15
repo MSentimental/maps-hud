@@ -1,4 +1,4 @@
-<!-- Compiled in Cursor | Last build update: 2/11/2026  8:21:35 PM | Version No. 7 -->
+<!-- Compiled in Cursor | Last build update: 2/14/2026  4:31:10 PM | Version No. 7 -->
 <!DOCTYPE html>
 <html lang="en">
     <head>
@@ -1734,6 +1734,8 @@
                         let searchResults = [];
                         let activeFilter = 'all';
                         let isNavigating = false;
+                        let cameraFollowEnabled = false;
+                        let userManuallyMovedMap = false;
                         let recentSearches = [];
 
                         try {
@@ -8229,6 +8231,8 @@ function drawNavigationRoute(latLngs, route) {
 
 function startActiveNav(route) {
     isNavigating = true;
+    cameraFollowEnabled = true;
+    userManuallyMovedMap = false;
     currentNavRoute = route;
     currentStepIndex = 0;
     totalRouteDistance = route.distance;
@@ -8264,6 +8268,57 @@ function startActiveNav(route) {
     }
 
     startNavigationUpdates();
+    showToast('Navigation started • Camera following', 3000);
+}
+
+function checkAndAdvanceStep() {
+    if (!isNavigating || !currentNavRoute || !currentNavRoute.steps) return;
+    if (currentStepIndex >= currentNavRoute.steps.length - 1) return;
+    
+    const userPos = getCurrentUserPosition();
+    if (!userPos) return;
+    
+    const currentStep = currentNavRoute.steps[currentStepIndex];
+    const nextStep = currentNavRoute.steps[currentStepIndex + 1];
+    
+    if (!nextStep || !nextStep.maneuver || !nextStep.maneuver.location) return;
+    
+    const maneuverPoint = L.latLng(nextStep.maneuver.location[1], nextStep.maneuver.location[0]);
+    const userLatLng = L.latLng(userPos[0], userPos[1]);
+
+    const distanceToManeuver = userLatLng.distanceTo(maneuverPoint);
+    
+    if (distanceToManeuver < 30) {
+        currentStepIndex++;
+        updateNavigationDisplay();
+        showToast(`Next: ${nextStep.maneuver.instruction || 'Continue'}`, 3000);
+    }
+}
+
+function updateTraveledPath(currentIndex) {
+    if (!window.navigationCamera || !window.navigationCamera.routePoints) return;
+    
+    const routePoints = window.navigationCamera.routePoints;
+    
+    if (window.traveledPathLayer && map.hasLayer(window.traveledPathLayer)) {
+        map.removeLayer(window.traveledPathLayer);
+    }
+    
+    if (currentIndex < 2) return;
+    
+    const passedPoints = routePoints.slice(0, currentIndex + 1);
+    
+    window.traveledPathLayer = L.polyline(passedPoints, {
+        color: '#6b7280',
+        weight: 5,
+        opacity: 0.5,
+        lineCap: 'round',
+        lineJoin: 'round'
+    }).addTo(map);
+    
+    if (window.navigationGeoJson) {
+        window.navigationGeoJson.setStyle({ opacity: 0.3 });
+    }
 }
 
 function startNavigationUpdates() {
@@ -8271,22 +8326,18 @@ function startNavigationUpdates() {
         clearInterval(window.navUpdateInterval);
     }
 
-    let isUserMovingMap = false;
-    let mapMoveTimeout;
+    map.on('movestart', (e) => {
+        if (!isNavigating) return;
 
-    map.on('movestart', () => {
-        isUserMovingMap = true;
-        clearTimeout(mapMoveTimeout);
-    });
-
-    map.on('moveend', () => {
-        mapMoveTimeout = setTimeout(() => {
-            isUserMovingMap = false;
-        }, 3000);
+        if (e.originalEvent) {
+            userManuallyMovedMap = true;
+            cameraFollowEnabled = false;
+            showToast('Camera unlocked • Tap "Re-Center" to follow', 2500);
+        }
     });
 
     window.navUpdateInterval = setInterval(() => {
-        if (!isNavigating || !window.navigationCamera || isUserMovingMap) {
+        if (!isNavigating || !window.navigationCamera) {
             return;
         }
 
@@ -8315,20 +8366,25 @@ function startNavigationUpdates() {
             camera.currentIndex = closestIndex;
 
             updateTraveledPath(closestIndex);
+            checkAndAdvanceStep(); 
 
             const lookAhead = Math.min(closestIndex + 10, camera.routePoints.length - 1);
 
             if (lookAhead > closestIndex) {
                 const targetPoint = camera.routePoints[closestIndex];
-                const currentCenter = map.getCenter();
-                const distanceToCenter = targetPoint.distanceTo(currentCenter);
+                
+                if (cameraFollowEnabled && !userManuallyMovedMap) {
+                    const currentCenter = map.getCenter();
+                    const distanceToCenter = targetPoint.distanceTo(currentCenter);
 
-                if (distanceToCenter > 300) {
-                    map.panTo(targetPoint, {
-                        animate: true,
-                        duration: 0.5,
-                        easeLinearity: 0.25
-                    });
+                    if (distanceToCenter > 300) {
+                        map.panTo(targetPoint, {
+                            animate: true,
+                            duration: 0.5,
+                            easeLinearity: 0.25,
+                            noMoveStart: true
+                        });
+                    }
                 }
 
                 camera.bearing = calculateBearing(
@@ -9385,7 +9441,18 @@ function closeSidebar() {
 
 function recenterMap() {
     if (userPos) {
-        map.flyTo(userPos, 14, { animate: true, duration: 1 });
+        if (isNavigating) {
+            cameraFollowEnabled = true;
+            userManuallyMovedMap = false;
+            map.flyTo(userPos, 16, { 
+                animate: true, 
+                duration: 1,
+                noMoveStart: true
+            });
+            showToast('Camera locked • Following your location', 2500);
+        } else {
+            map.flyTo(userPos, 14, { animate: true, duration: 1 });
+        }
         userMarker.setLatLng(userPos);
     }
 }
@@ -9501,11 +9568,25 @@ function isNearFerryTerminal(point, terminals) {
 
 function exitNavigation() {
     isNavigating = false;
+    cameraFollowEnabled = false;
+    userManuallyMovedMap = false;
     document.body.classList.remove('navigating');
+
+    map.off('movestart');
+
+    if (window.navUpdateInterval) {
+        clearInterval(window.navUpdateInterval);
+        window.navUpdateInterval = null;
+    }
 
     if (window.navigationGeoJson && map.hasLayer(window.navigationGeoJson)) {
         map.removeLayer(window.navigationGeoJson);
         window.navigationGeoJson = null;
+    }
+
+    if (window.traveledPathLayer && map.hasLayer(window.traveledPathLayer)) {
+        map.removeLayer(window.traveledPathLayer);
+        window.traveledPathLayer = null;
     }
 
     if (window.currentRouteGeoJson && routeLayer.hasLayer(window.currentRouteGeoJson)) {
@@ -9523,6 +9604,8 @@ function exitNavigation() {
 
     currentNavRoute = null;
     currentStepIndex = 0;
+    
+    showToast('Navigation ended', 2000);
 }
 
 function updateRealTimeMarkerRotation(bearing) {
